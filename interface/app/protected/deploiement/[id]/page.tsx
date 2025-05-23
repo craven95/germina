@@ -32,9 +32,12 @@ export default function DeploiementPage({ params }: DeploiementProps) {
   const POLL_INTERVAL = 3000;
   const TIMEOUT_MS = 3 * 60 * 1000;
 
-  const getToken = async () => {
+  const getToken = async (): Promise<string> => {
     const { data: { session } } = await supabase.auth.getSession();
-    return session?.access_token;
+    if (!session?.access_token) {
+      throw new Error('No access token available');
+    }
+    return session.access_token;
   };
 
   const fetchCurrentImage = async (token: string) => {

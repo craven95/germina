@@ -21,7 +21,7 @@ export default function StatisticsPage() {
     const numericCols: Record<string, number[]> = {};
     data.forEach(row => {
       Object.entries(row).forEach(([key, value]) => {
-        const num = parseFloat(value);
+        const num = parseFloat(value as string);
         if (!isNaN(num)) {
           numericCols[key] = numericCols[key] || [];
           numericCols[key].push(num);
