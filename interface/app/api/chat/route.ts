@@ -27,10 +27,10 @@ export async function POST(req: Request) {
     if (!raw) {
       throw new Error('Aucune réponse de l’agent');
     }
-    const cleaned = raw
-      .replace(/```json|```/g, '')
-      .trim();
-
+    const cleaned = (typeof raw === 'string' ? raw : JSON.stringify(raw))
+    .replace(/```json|```/g, '')
+    .trim();
+    
     console.log('Réponse brute nettoyée:', cleaned);
 
     
