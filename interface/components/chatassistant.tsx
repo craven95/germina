@@ -78,15 +78,19 @@ const applySafeModifications = useCallback(
       console.log('Applying patches:', patches);
       console.log('Initial state:', JSON.stringify(current, null, 2));
 
-      const result = jsonpatch.apply(current, patches as Operation[]);
-      
-      if (result === undefined) {
-        throw new Error('Application du patch échouée');
+      // Utilisation de jsonpatch.apply
+      // Compatible dynamic apply function
+      const applyFn = (jsonpatch as any).apply ?? (jsonpatch as any).applyPatch;
+      if (typeof applyFn !== 'function') {
+        throw new Error('Aucune fonction apply disponible dans fast-json-patch');
       }
+      const patchResult = applyFn(current as any, patches as Operation[], /*validate*/ true);
 
-      console.log('Patched document:', JSON.stringify(result, null, 2));
+      const newDoc = patchResult && (patchResult.newDocument ?? patchResult);
 
-      onModify({ [target]: result });
+      console.log('Patched document:', JSON.stringify(newDoc, null, 2));
+
+      onModify({ [target]: newDoc });
       return true;
     } catch (error) {
       console.error('Erreur détaillée:', error);
