@@ -1,0 +1,43 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.env
+*.venv/
+env/
+venv/
+env.bak/
+*.egg-info/
+
+# dotenv
+.env
+.env.*
+
+# Docker
+*.log
+docker-compose.override.yml
+
+# Node / Next.js (interface/)
+interface/node_modules/
+interface/.next/
+interface/out/
+interface/.env.local
+interface/.env.development
+interface/.env.test
+interface/.env.production
+
+# VSCode
+.vscode/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDEs
+.idea/
+*.sublime-project
+*.sublime-workspace
