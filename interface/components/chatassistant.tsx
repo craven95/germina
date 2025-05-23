@@ -1,11 +1,19 @@
 'use client';
 
 import Ajv from 'ajv';
-import { applyPatch, type Operation } from 'fast-json-patch';
+import * as jsonpatch from 'fast-json-patch';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import Lottie from 'lottie-react';
 import waveAnimation from './animations/cat_waiting.json';
+
+
+interface Operation {
+  op: 'add' | 'remove' | 'replace' | 'move' | 'copy' | 'test';
+  path: string;
+  value?: any;
+  from?: string;
+}
 
 
 interface Message {
@@ -70,15 +78,15 @@ const applySafeModifications = useCallback(
       console.log('Applying patches:', patches);
       console.log('Initial state:', JSON.stringify(current, null, 2));
 
-      const result = applyPatch(current, patches as Operation[]);
+      const result = jsonpatch.apply(current, patches as Operation[]);
       
-      if (result.newDocument === undefined) {
+      if (result === undefined) {
         throw new Error('Application du patch échouée');
       }
 
-      console.log('Patched document:', JSON.stringify(result.newDocument, null, 2));
+      console.log('Patched document:', JSON.stringify(result, null, 2));
 
-      onModify({ [target]: result.newDocument });
+      onModify({ [target]: result });
       return true;
     } catch (error) {
       console.error('Erreur détaillée:', error);
@@ -94,7 +102,7 @@ const applySafeModifications = useCallback(
     if (!input.trim() || isLoading) return;
 
     setIsLoading(true);
-    const userMessage = { role: 'user', content: input };
+    const userMessage: Message = { role: 'user', content: input };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
 
