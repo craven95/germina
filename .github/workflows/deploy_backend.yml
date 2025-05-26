@@ -30,25 +30,8 @@ jobs:
       - name: Push Docker image to Scaleway Registry
         run: |
           docker push rg.fr-par.scw.cloud/builder-namespace/germina-backend:${{ github.sha }}
-
-      - name: Install Scaleway CLI
+      
+      - name: Update Scaleway Serverless Container image
         run: |
-          curl -sSL https://github.com/scaleway/scaleway-cli/releases/latest/download/scw-linux-amd64 -o scw
-          chmod +x scw
-          sudo mv scw /usr/local/bin/scw
-          scw version
-
-      - name: Configure Scaleway CLI
-        run: |
-          scw config init -t "${{ secrets.SCW_SECRET_KEY }}" -o json > /dev/null
-          scw config set project-id=${{ secrets.SCW_PROJECT_ID }}
-          scw config set region=fr-par
-
-      - name: Deploy to Scaleway Serverless Containers
-        run: |
-          scw container container create germina-backend \
-            image=rg.fr-par.scw.cloud/builder-namespace/germina-backend:${{ github.sha }} \
-            env-vars="SUPABASE_URL=${{ secrets.SUPABASE_URL }},SUPABASE_KEY=${{ secrets.SUPABASE_KEY }},SCW_SECRET_KEY=${{ secrets.SCW_SECRET_KEY }}" \
-            min-scale=0 \
-            max-scale=1 \
-            port=8080
+          scw container container update bd063f12-f4a4-4fa9-b037-a76d12361d72 \
+            image=rg.fr-par.scw.cloud/builder-namespace/germina-backend:${{ github.sha }}
