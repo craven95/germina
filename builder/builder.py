@@ -31,10 +31,22 @@ SCW_API_BASE = f"https://api.scaleway.com/registry/v1/regions/{SCW_REGION}"
 SCW_NAMESPACE_ID = "a19516b3-bd56-4d61-8df6-2833cfd5324c"
 SCW_REGISTRY_DOMAIN = "rg.fr-par.scw.cloud"
 SCW_REGISTRY_NS = "germina-namespace"
-SCW_SECRET_KEY = os.getenv("SCW_SECRET_KEY")
+SCW_SECRET_KEY = os.getenv("SCW_SECRET_KEY", "")
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    print(
+        "Erreur : Les variables d'environnement SUPABASE_URL et SUPABASE_KEY doivent être définies."
+        " Veuillez les configurer dans votre fichier .env."
+    )
+
+if not SCW_SECRET_KEY:
+    print(
+        "Erreur : La variable d'environnement SCW_SECRET_KEY doit être définie."
+        " Veuillez la configurer dans votre fichier .env."
+    )
 
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
