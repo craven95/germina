@@ -1,6 +1,6 @@
 fastapi
 uvicorn[standard]
 python-dotenv
-supabase-py
+supabase
 docker
 requests
