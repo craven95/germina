@@ -33,11 +33,11 @@ SCW_REGISTRY_DOMAIN = "rg.fr-par.scw.cloud"
 SCW_REGISTRY_NS = "germina-namespace"
 SCW_SECRET_KEY = os.getenv("SCW_SECRET_KEY")
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
+NEXT_PUBLIC_SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase: Client = create_client(NEXT_PUBLIC_SUPABASE_URL, SUPABASE_KEY)
 docker_client = docker.from_env()
 
 security = HTTPBearer()
