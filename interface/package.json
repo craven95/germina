@@ -20,7 +20,6 @@
     "autoprefixer": "10.4.20",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
-    "fast-json-patch": "^3.1.1",
     "lottie-react": "^2.4.1",
     "lucide-react": "^0.468.0",
     "next": "latest",
@@ -30,12 +29,12 @@
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-error-boundary": "^6.0.0",
+    "rfc6902": "^5.1.2",
     "survey-core": "^2.0.8",
     "survey-creator-react": "^2.0.8",
     "survey-react-ui": "^2.0.8"
   },
   "devDependencies": {
-    "@types/fast-json-patch": "^1.0.4",
     "@types/node": "22.10.2",
     "@types/papaparse": "^5.3.16",
     "@types/react": "19.0.8",
