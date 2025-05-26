@@ -25,11 +25,11 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t rg.fr-par.scw.cloud/germina-namespace/germina-backend:${{ github.sha }} ./builder
+          docker build -t rg.fr-par.scw.cloud/builder-namespace/germina-backend:${{ github.sha }} ./builder
 
       - name: Push Docker image to Scaleway Registry
         run: |
-          docker push rg.fr-par.scw.cloud/germina-namespace/germina-backend:${{ github.sha }}
+          docker push rg.fr-par.scw.cloud/builder-namespace/germina-backend:${{ github.sha }}
 
       - name: Install Scaleway CLI
         run: |
@@ -47,7 +47,7 @@ jobs:
       - name: Deploy to Scaleway Serverless Containers
         run: |
           scw container container create germina-backend \
-            image=rg.fr-par.scw.cloud/germina-namespace/germina-backend:${{ github.sha }} \
+            image=rg.fr-par.scw.cloud/builder-namespace/germina-backend:${{ github.sha }} \
             env-vars="SUPABASE_URL=${{ secrets.SUPABASE_URL }},SUPABASE_KEY=${{ secrets.SUPABASE_KEY }},SCW_SECRET_KEY=${{ secrets.SCW_SECRET_KEY }}" \
             min-scale=0 \
             max-scale=1 \
