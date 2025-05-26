@@ -35,6 +35,8 @@ jobs:
         run: |
           curl -fsSL https://raw.githubusercontent.com/scaleway/scaleway-cli/main/install.sh | bash
           echo "$HOME/bin" >> $GITHUB_PATH
+          export PATH="$HOME/bin:$PATH"
+          scw version
 
       - name: Configure Scaleway CLI
         run: |
