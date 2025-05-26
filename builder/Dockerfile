@@ -14,6 +14,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY builder.py /app/
 COPY survey_template /app/survey_template
 
-EXPOSE 5000
+EXPOSE 8080
 
-CMD ["uvicorn", "builder:app", "--host", "0.0.0.0", "--port", "5000"]
+CMD ["sh", "-c", "uvicorn builder:app --host 0.0.0.0 --port ${PORT}"]
