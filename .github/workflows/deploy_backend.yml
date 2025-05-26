@@ -1,4 +1,4 @@
-name: Deploy FastAPI → Cloud Run
+name: Deploy FastAPI → Scaleway
 
 on:
   push:
@@ -19,44 +19,34 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Authenticate to GCP (Service Account JSON)
-        uses: google-github-actions/auth@v1
-        with:
-          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-
-      - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
-        with:
-          version: 'latest'
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
-
-      - name: Configure Docker for GCR
-        run: gcloud auth configure-docker --quiet
+      - name: Login to Scaleway Container Registry
+        run: |
+          echo "${{ secrets.SCW_SECRET_KEY }}" | docker login rg.fr-par.scw.cloud -u nologin --password-stdin
 
       - name: Build Docker image
         run: |
-          gcloud builds submit builder \
-            --tag "gcr.io/${{ secrets.GCP_PROJECT_ID }}/germina-backend:${{ github.sha }}" \
-            --quiet
+          docker build -t rg.fr-par.scw.cloud/germina-namespace/germina-backend:${{ github.sha }} ./builder
 
-      - name: Scan image for vulnerabilities
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: "gcr.io/${{ secrets.GCP_PROJECT_ID }}/germina-backend:${{ github.sha }}"
-
-      - name: Fetch secrets from Secret Manager
+      - name: Push Docker image to Scaleway Registry
         run: |
-          echo "SUPABASE_URL=$(gcloud secrets versions access latest --secret='supabase-url')" >> $GITHUB_ENV
-          echo "SUPABASE_KEY=$(gcloud secrets versions access latest --secret='supabase-key')" >> $GITHUB_ENV
-          echo "SCW_SECRET_KEY=$(gcloud secrets versions access latest --secret='scw-secret-key')" >> $GITHUB_ENV
+          docker push rg.fr-par.scw.cloud/germina-namespace/germina-backend:${{ github.sha }}
 
-      - name: Deploy to Cloud Run
+      - name: Install Scaleway CLI
         run: |
-          gcloud run deploy germina-backend \
-            --image "gcr.io/${{ secrets.GCP_PROJECT_ID }}/germina-backend:${{ github.sha }}" \
-            --region europe-west1 \
-            --platform managed \
-            --allow-unauthenticated \
-            --set-env-vars "SUPABASE_URL=${{ env.SUPABASE_URL }}" \
-            --set-env-vars "SUPABASE_KEY=${{ env.SUPABASE_KEY }}" \
-            --set-env-vars "SCW_SECRET_KEY=${{ env.SCW_SECRET_KEY }}"
+          curl -fsSL https://raw.githubusercontent.com/scaleway/scaleway-cli/main/install.sh | bash
+          echo "$HOME/bin" >> $GITHUB_PATH
+
+      - name: Configure Scaleway CLI
+        run: |
+          scw config init -t "${{ secrets.SCW_SECRET_KEY }}" -o json > /dev/null
+          scw config set project-id=${{ secrets.SCW_PROJECT_ID }}
+          scw config set region=fr-par
+
+      - name: Deploy to Scaleway Serverless Containers
+        run: |
+          scw container container create germina-backend \
+            image=rg.fr-par.scw.cloud/germina-namespace/germina-backend:${{ github.sha }} \
+            env-vars="SUPABASE_URL=${{ secrets.SUPABASE_URL }},SUPABASE_KEY=${{ secrets.SUPABASE_KEY }},SCW_SECRET_KEY=${{ secrets.SCW_SECRET_KEY }}" \
+            min-scale=0 \
+            max-scale=1 \
+            port=8080
