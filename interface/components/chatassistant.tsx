@@ -1,7 +1,7 @@
 'use client';
 
 import Ajv from 'ajv';
-import { applyPatch } from 'fast-json-patch';
+import { applyOperation } from 'fast-json-patch';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import Lottie from 'lottie-react';
@@ -78,7 +78,7 @@ const applySafeModifications = useCallback(
       console.log('Applying patches:', patches);
       console.log('Initial state:', JSON.stringify(current, null, 2));
 
-      const patchResult = applyPatch(current as any, patches as Operation[], /*validate*/ true);
+      const patchResult = applyOperation(current as any, patches as Operation[], /*validate*/ true);
 
       const newDoc = patchResult && (patchResult.newDocument ?? patchResult);
 
