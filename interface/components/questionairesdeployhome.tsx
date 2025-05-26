@@ -1,36 +1,12 @@
 'use client';
 
-import { createClient } from '@/utils/supabase/client';
 import { Rocket } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 export default function QuestionnairesDeployHome({ questionnaires }: { questionnaires: any[] }) {
   const router = useRouter();
-  const supabase = createClient();
   const [loadingId, setLoadingId] = useState<string | null>(null);
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('Supprimer ce questionnaire ?')) return;
-    setLoadingId(id);
-    const { error } = await supabase.from('questionnaires').delete().eq('id', id);
-    if (error) {
-      console.error(error);
-      setLoadingId(null);
-    } else {
-      router.refresh();
-    }
-  };
-
-  const handleDownload = (q: any) => {
-    const blob = new Blob([JSON.stringify(q.schema_json, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${q.title || 'questionnaire'}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
 
   return (
     <section className="container mx-auto px-6 py-16 text-center">

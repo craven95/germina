@@ -10,4 +10,4 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
       <SurveyEditor id={id} />
     </Suspense>
   );
-} 
+}
