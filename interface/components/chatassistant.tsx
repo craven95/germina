@@ -1,7 +1,7 @@
 'use client';
 
 import Ajv from 'ajv';
-import * as jsonpatch from 'fast-json-patch';
+import { applyPatch } from 'fast-json-patch';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import Lottie from 'lottie-react';
@@ -78,13 +78,7 @@ const applySafeModifications = useCallback(
       console.log('Applying patches:', patches);
       console.log('Initial state:', JSON.stringify(current, null, 2));
 
-      // Utilisation de jsonpatch.apply
-      // Compatible dynamic apply function
-      const applyFn = (jsonpatch as any).apply ?? (jsonpatch as any).applyPatch;
-      if (typeof applyFn !== 'function') {
-        throw new Error('Aucune fonction apply disponible dans fast-json-patch');
-      }
-      const patchResult = applyFn(current as any, patches as Operation[], /*validate*/ true);
+      const patchResult = applyPatch(current as any, patches as Operation[], /*validate*/ true);
 
       const newDoc = patchResult && (patchResult.newDocument ?? patchResult);
 
