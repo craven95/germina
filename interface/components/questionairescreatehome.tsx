@@ -27,10 +27,11 @@ export default function QuestionnairesCreateHome({ questionnaires }: Questionnai
     setError(null);
 
     try {
+      const builderApiUrl = process.env.NEXT_PUBLIC_BUILDER_API_URL || 'http://localhost:5000';
       const token = (await supabase.auth.getSession()).data.session?.access_token;
       if (token) {
         const delImg = await fetch(
-          `http://localhost:5000/delete_image?questionnaire_id=${id}&tag=latest`,
+          `${builderApiUrl}/delete_image?questionnaire_id=${id}&tag=latest`,
           { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }
         );
         if (delImg.ok || delImg.status === 404) {

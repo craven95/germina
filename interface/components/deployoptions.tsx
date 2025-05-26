@@ -21,7 +21,7 @@ const DeployOptions = ({ image, onClose }: DeployOptionsProps) => {
     try {
       if (deployType === 'local') {
         console.log('Déploiement LOCAL sur', osType)
-        const res = await fetch('http://localhost:5000/generate_deploy_script', {
+        const res = await fetch('${builderApiUrl}/generate_deploy_script', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -42,7 +42,7 @@ const DeployOptions = ({ image, onClose }: DeployOptionsProps) => {
         a.click()
         document.body.removeChild(a)
       } else {
-        await fetch('http://localhost:5000/deploy-remote', {
+        await fetch('${builderApiUrl}/deploy-remote', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

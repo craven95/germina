@@ -7,34 +7,48 @@ on:
       - 'survey_template/**'
       - 'Dockerfile'
       - 'requirements.txt'
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Setup Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
+      - name: Authenticate to GCP via OIDC
+        uses: google-github-actions/auth@v1
         with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
-          service_account_key: ${{ secrets.GCP_CREDENTIALS }}
+          workload_identity_provider: projects/12345/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: deploy-sa@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com
 
-      - name: Build & Push Docker image
+      - name: Configure Docker for GCR
+        run: gcloud auth configure-docker --quiet
+
+      - name: Build Docker image
         run: |
-          IMAGE="gcr.io/${{ secrets.GCP_PROJECT_ID }}/germina-backend:${{ github.sha }}"
-          docker build -t $IMAGE .
-          docker push $IMAGE
+          gcloud builds submit \
+            --tag "gcr.io/${{ secrets.GCP_PROJECT_ID }}/germina-backend:${{ github.sha }}" \
+            --quiet
+
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: "gcr.io/${{ secrets.GCP_PROJECT_ID }}/germina-backend:${{ github.sha }}"
+
+      - name: Fetch secrets from Secret Manager
+        run: |
+          echo "SUPABASE_URL=$(gcloud secrets versions access latest --secret='supabase-url')" >> $GITHUB_ENV
+          echo "SUPABASE_KEY=$(gcloud secrets versions access latest --secret='supabase-key')" >> $GITHUB_ENV
+          echo "SCW_SECRET_KEY=$(gcloud secrets versions access latest --secret='scw-secret-key')" >> $GITHUB_ENV
 
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy germina-backend \
-            --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/germina-backend:${{ github.sha }} \
+            --image "gcr.io/${{ secrets.GCP_PROJECT_ID }}/germina-backend:${{ github.sha }}" \
             --region europe-west1 \
             --platform managed \
-            --allow-unauthenticated
+            --allow-unauthenticated \
+            --set-env-vars "SUPABASE_URL=${{ env.SUPABASE_URL }}" \
+            --set-env-vars "SUPABASE_KEY=${{ env.SUPABASE_KEY }}" \
+            --set-env-vars "SCW_SECRET_KEY=${{ env.SCW_SECRET_KEY }}"

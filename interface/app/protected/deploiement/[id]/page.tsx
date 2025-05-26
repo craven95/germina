@@ -32,6 +32,8 @@ export default function DeploiementPage({ params }: DeploiementProps) {
   const POLL_INTERVAL = 3000;
   const TIMEOUT_MS = 3 * 60 * 1000;
 
+  const builderApiUrl = process.env.NEXT_PUBLIC_BUILDER_API_URL || 'http://localhost:5000';
+
   const getToken = async (): Promise<string> => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) {
@@ -42,7 +44,7 @@ export default function DeploiementPage({ params }: DeploiementProps) {
 
   const fetchCurrentImage = async (token: string) => {
     const res = await fetch(
-      `http://localhost:5000/list?questionnaire_id=${id}`,
+      `${builderApiUrl}/list?questionnaire_id=${id}`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
     const { images: imgs } = await res.json();
@@ -86,7 +88,7 @@ export default function DeploiementPage({ params }: DeploiementProps) {
       const token = await getToken();
       const { data: { user } } = await supabase.auth.getUser();
       const resp = await fetch(
-        `http://localhost:5000/build/${id}`,
+        `${builderApiUrl}/build/${id}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -127,7 +129,7 @@ export default function DeploiementPage({ params }: DeploiementProps) {
     try {
       const token = await getToken();
       const resp = await fetch(
-        `http://localhost:5000/delete_image?questionnaire_id=${id}&tag=latest`,
+        `${builderApiUrl}/delete_image?questionnaire_id=${id}&tag=latest`,
         { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }
       );
       if (!resp.ok) {
