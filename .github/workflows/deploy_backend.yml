@@ -3,10 +3,8 @@ name: Deploy FastAPI → Cloud Run
 on:
   push:
     paths:
-      - 'builder.py'
+      - 'builder/**'
       - 'survey_template/**'
-      - 'Dockerfile'
-      - 'requirements.txt'
     branches: [ main ]
   workflow_dispatch:
 
@@ -27,7 +25,7 @@ jobs:
 
       - name: Build Docker image
         run: |
-          gcloud builds submit \
+          gcloud builds submit builder \
             --tag "gcr.io/${{ secrets.GCP_PROJECT_ID }}/germina-backend:${{ github.sha }}" \
             --quiet
 
