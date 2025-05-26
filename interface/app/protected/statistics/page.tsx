@@ -1,15 +1,12 @@
 'use client';
 
 import { UploadCloud, CloudRain } from 'lucide-react';
-import Lottie from 'lottie-react';
-import waveAnimation from '../../../components/animations/cat_waiting.json';
 
 export default function StatisticsPage() {
 
   return (
     <section className="container mx-auto px-6 py-12 max-w-3xl">
       <div className="flex items-center">
-      <div className="w-20 h-20"><Lottie animationData={waveAnimation} loop /></div>
       <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-gray-100">
         Chantier en cours...
       </h1>
