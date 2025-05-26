@@ -14,18 +14,21 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
+
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Authenticate to GCP (Service Account JSON)
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
 
       - name: Set up Google Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
         with:
+          version: 'latest'
           project_id: ${{ secrets.GCP_PROJECT_ID }}
-          service_account_key: ${{ secrets.GCP_CREDENTIALS }}
-          auth_method: service_account
-          export_default_credentials: true   # facultatif si vous n'avez pas besoin d'ADC ailleurs
 
       - name: Configure Docker for GCR
         run: gcloud auth configure-docker --quiet
