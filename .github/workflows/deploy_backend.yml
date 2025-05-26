@@ -24,7 +24,8 @@ jobs:
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
           service_account_key: ${{ secrets.GCP_CREDENTIALS }}
-          export_default_credentials: true
+          auth_method: service_account
+          export_default_credentials: true   # facultatif si vous n'avez pas besoin d'ADC ailleurs
 
       - name: Configure Docker for GCR
         run: gcloud auth configure-docker --quiet
