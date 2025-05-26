@@ -1,20 +1,11 @@
 'use client';
 
 import Ajv from 'ajv';
-import { applyOperation } from 'fast-json-patch';
+import { applyPatch, Operation } from 'rfc6902';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import Lottie from 'lottie-react';
 import waveAnimation from './animations/cat_waiting.json';
-
-
-interface Operation {
-  op: 'add' | 'remove' | 'replace' | 'move' | 'copy' | 'test';
-  path: string;
-  value?: any;
-  from?: string;
-}
-
 
 interface Message {
   role: 'user' | 'assistant';
@@ -78,14 +69,14 @@ const applySafeModifications = useCallback(
       console.log('Applying patches:', patches);
       console.log('Initial state:', JSON.stringify(current, null, 2));
 
-      const patchResult = applyOperation(current as any, patches as Operation[], /*validate*/ true);
+      const errors = applyPatch(current as any, patches as Operation[]);
+      if (errors.some(err => err instanceof Error)) {
+        throw new Error('Erreur lors de l\'application des patches: ' + errors.map(e => (e as Error).message).join(', '));
+      }
 
-      const newDoc = patchResult && (patchResult.newDocument ?? patchResult);
-
-      console.log('Patched document:', JSON.stringify(newDoc, null, 2));
-
-      onModify({ [target]: newDoc });
-      return true;
+      console.log('Patched document:', JSON.stringify(current, null, 2));
+      onModify({ [target]: current });
+    return true;
     } catch (error) {
       console.error('Erreur détaillée:', error);
       return false;
