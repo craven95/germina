@@ -19,6 +19,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Scaleway CLI
+        run: |
+          curl -O https://github.com/scaleway/scaleway-cli/releases/download/v2.28.0/scaleway-cli_2.28.0_linux_amd64
+          sudo mv scaleway-cli_2.28.0_linux_amd64 /usr/local/bin/scw
+          sudo chmod +x /usr/local/bin/scw
+
+      - name: Configure Scaleway CLI
+        run: |
+          scw config set access-key=${{ secrets.SCW_SECRET_KEY }}
+          scw config set region=$SCW_REGION
+          scw config set default-project-id=${{ secrets.SCW_PROJECT_ID }}
+
       - name: Login to Scaleway Container Registry
         run: |
           echo "${{ secrets.SCW_SECRET_KEY }}" | docker login rg.fr-par.scw.cloud -u nologin --password-stdin
