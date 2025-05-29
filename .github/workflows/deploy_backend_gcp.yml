@@ -40,8 +40,8 @@ jobs:
 
       - name: Deploy to Cloud Run
         run: |
-          gcloud run deploy germina-backend \
-            --image $IMAGE \
+          gcloud run deploy builder \
+            --image europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/germina-backend/builder:${{ github.sha }} \
             --region europe-west1 \
             --platform managed \
             --allow-unauthenticated

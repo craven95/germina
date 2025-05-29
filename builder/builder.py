@@ -112,7 +112,7 @@ class BuildPayload(BaseModel):
 
 class DeployScriptPayload(BaseModel):
     image: str
-    port: Optional[int] = 8000
+    port: Optional[int] = 5000
     volume_path: Optional[str] = "~/docker_data"
     os: str
     qid: Optional[str] = "unknown"
@@ -253,7 +253,7 @@ def generate_deploy_script(p: DeployScriptPayload):
     pull_cmd = f"docker pull {image_full}"
     run_cmd = (
         f"docker run -d --restart unless-stopped "
-        f"-v {p.volume_path}:/app/data -p {p.port}:8000 "
+        f"-v {p.volume_path}:/app/data -p {p.port}:5000 "
         f"--name germina_survey_local {image_full}"
     )
 
