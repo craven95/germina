@@ -16,4 +16,4 @@ COPY survey_template /app/survey_template
 
 EXPOSE 8080
 
-CMD ["uvicorn", "builder:app", "--host", "0.0.0.0", "--port", "${PORT}"]
+CMD ["uvicorn", "builder:app", "--host", "0.0.0.0", "--port", "8080"]
