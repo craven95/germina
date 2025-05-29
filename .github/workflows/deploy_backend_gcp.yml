@@ -15,29 +15,26 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v3
 
-      - name: Checkout
-        uses: actions/checkout@v3
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
 
       - name: Set up Google Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
-          service_account_key: ${{ secrets.GCP_CREDENTIALS }}
-          auth_method: service_account
-          export_default_credentials: true
-
-      - name: Configure Docker for GCR
-        run: |
-          gcloud auth configure-docker --quiet
 
       - name: Configure Docker for Artifact Registry
         run: |
           gcloud auth configure-docker europe-west1-docker.pkg.dev --quiet
-      
+
       - name: Build & Push Docker image
+        env:
+          IMAGE: europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/germina-backend/builder:${{ github.sha }}
         run: |
-          IMAGE="europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/germina-backend/builder:${{ github.sha }}"
           docker build -t $IMAGE builder/
           docker push $IMAGE
 
