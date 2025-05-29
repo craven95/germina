@@ -1,11 +1,13 @@
 name: Deploy FastAPI → Scaleway
 
 on:
-  push:
-    paths:
-      - 'builder/**'
-      - 'survey_template/**'
-    branches: [ main ]
+  # FOR THE MOMENT WE WILL NOT USE THIS WORKFLOW 
+  # We use gcp but later maybe we will use scaleway
+  # push:
+  #   paths:
+  #     - 'builder/**'
+  #     - 'survey_template/**'
+  #   branches: [ main ]
   workflow_dispatch:
 
 permissions:
