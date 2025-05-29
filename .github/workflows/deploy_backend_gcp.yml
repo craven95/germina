@@ -30,9 +30,13 @@ jobs:
         run: |
           gcloud auth configure-docker --quiet
 
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker europe-west1-docker.pkg.dev --quiet
+      
       - name: Build & Push Docker image
         env:
-          IMAGE: gcr.io/${{ secrets.GCP_PROJECT_ID }}/germina-backend:${{ github.sha }}
+          IMAGE="europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/germina-backend/builder:${{ github.sha }}"
         run: |
           docker build -t $IMAGE builder/
           docker push $IMAGE
