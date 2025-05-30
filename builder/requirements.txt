@@ -4,3 +4,7 @@ python-dotenv
 supabase
 docker
 requests
+google-api-core
+google-cloud-build
+google-cloud-container
+google-cloud-storage
