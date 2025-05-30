@@ -8,3 +8,4 @@ google-api-core
 google-cloud-build
 google-cloud-container
 google-cloud-storage
+google-cloud-artifact-registry==1.9.0

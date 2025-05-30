@@ -11,7 +11,7 @@ from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Res
 from fastapi.logger import logger
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from google.api_core.client_options import ClientOptions
-from google.cloud import container_v1 as gcr
+from google.cloud import artifactregistry_v1 as ar
 from google.cloud import storage
 from google.cloud.devtools import cloudbuild_v1
 from pydantic import BaseModel
@@ -24,8 +24,9 @@ from fastapi.middleware.cors import CORSMiddleware
 # Configuration Google Cloud
 GCP_PROJECT = "germina-461108"
 CLOUD_BUILD_REGION = "europe-west1"
-GCR_REGISTRY = "gcr.io"
-GCR_REPO = GCR_REGISTRY + "/" + GCP_PROJECT
+GCR_LOCATION = "europe-west1"  # Location for Artifact Registry
+GCR_REPOSITORY = "germina-user-interface"  # Your Artifact Registry repository name
+GCR_REPO_PATH = f"{GCR_LOCATION}-docker.pkg.dev/{GCP_PROJECT}/{GCR_REPOSITORY}"
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
@@ -49,6 +50,7 @@ app.add_middleware(
 )
 
 
+# Modèles Pydantic
 class BuildPayload(BaseModel):
     user_id: str
     title: str
@@ -64,18 +66,22 @@ class DeployScriptPayload(BaseModel):
     qid: Optional[str] = "unknown"
 
 
+# Fonctions utilitaires
 def prepare_build_context(qid: str, user_id: str) -> str:
     """Prépare et upload le contexte de build vers GCS"""
     with tempfile.TemporaryDirectory() as tmp_dir:
+        # Copier le template
         base = Path(__file__).parent / "survey_template"
         build_dir = Path(tmp_dir) / "custom_build_context"
         shutil.copytree(base, build_dir, dirs_exist_ok=True)
 
+        # Créer une archive
         archive_name = f"context_{qid}_{user_id}.tar.gz"
         archive_path = Path(tmp_dir) / archive_name
         with tarfile.open(archive_path, "w:gz") as tar:
             tar.add(build_dir, arcname=".")
 
+        # Upload vers GCS
         storage_client = storage.Client()
         bucket = storage_client.bucket("germina-build-context")
         blob = bucket.blob(archive_name)
@@ -94,6 +100,7 @@ def get_current_user(creds: HTTPAuthorizationCredentials = Depends(security)):
     except:
         raise HTTPException(status_code=401, detail="Token invalide")
 
+    # Vérification du quota
     stat = (
         supabase.table("api_usage")
         .select("count")
@@ -106,6 +113,7 @@ def get_current_user(creds: HTTPAuthorizationCredentials = Depends(security)):
     if current >= 605:
         raise HTTPException(status_code=429, detail="Quota dépassé")
 
+    # Mise à jour du quota
     supabase.table("api_usage").upsert(
         {"user_id": user.id, "count": current + 1}
     ).execute()
@@ -139,10 +147,18 @@ def build_image(
     bg: BackgroundTasks,
     user=Depends(get_current_user),
 ):
+    # Vérifier les droits
+    check_registry_access(user.id, questionnaire_id)
+
+    # Préparer le contexte
     context_object = prepare_build_context(questionnaire_id, user.id)
+
+    # Mettre à jour le statut
     supabase.table("questionnaires").update(
         {"docker_status": "pending", "docker_image": None}
     ).eq("id", questionnaire_id).eq("user_id", user.id).execute()
+
+    # Lancer le build
     bg.add_task(launch_build, questionnaire_id, payload, user.id, context_object)
     return {"status": "pending", "questionnaire_id": questionnaire_id}
 
@@ -165,28 +181,34 @@ def build_status(questionnaire_id: str = Query(...), user=Depends(get_current_us
 
 @app.get("/list")
 def list_images(questionnaire_id: str, user=Depends(get_current_user)):
-    """Liste les images dans GCR pour le questionnaire"""
+    """Liste les images dans Artifact Registry pour le questionnaire"""
     image_prefix = f"user_{user.id}_q_{questionnaire_id}"
 
-    client = gcr.ImageServiceClient()
-    parent = f"projects/{GCP_PROJECT}/locations/{CLOUD_BUILD_REGION}"
+    # Initialiser le client Artifact Registry
+    client = ar.ArtifactRegistryClient()
+    parent = (
+        f"projects/{GCP_PROJECT}/locations/{GCR_LOCATION}/repositories/{GCR_REPOSITORY}"
+    )
 
+    # Lister les images
     images = []
     try:
-        for image in client.list_images(parent=parent):
-            if image.uri.startswith(f"{GCR_REPO}/{image_prefix}"):
-                # Extraire le tag de l'URI
+        request = ar.ListDockerImagesRequest(parent=parent)
+        page_result = client.list_docker_images(request=request)
+        for image in page_result:
+            image_name = image.uri.split("/")[-1].split(":")[0]
+            if image_name.startswith(image_prefix):
                 tag = image.uri.split(":")[-1] if ":" in image.uri else "latest"
                 images.append(
                     {
                         "name": image.uri,
                         "tag": tag,
-                        "updated_at": image.update_time.isoformat(),
+                        "updated_at": image.upload_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     }
                 )
     except Exception as e:
-        logger.error(f"Erreur GCR: {str(e)}")
-        raise HTTPException(500, "Erreur de listing GCR")
+        logger.error(f"Erreur Artifact Registry: {str(e)}")
+        raise HTTPException(500, "Erreur de listing des images")
 
     return {"images": images}
 
@@ -197,27 +219,30 @@ def delete_image(
     tag: str = Query(...),
     user=Depends(get_current_user),
 ):
-    """Supprime une image dans GCR"""
+    """Supprime une image dans Artifact Registry"""
     image_name = f"user_{user.id}_q_{questionnaire_id}"
-    full_image_name = f"{GCR_REPO}/{image_name}:{tag}"
+    full_image_name = f"{GCR_REPO_PATH}/{image_name}:{tag}"
 
-    client = gcr.ImageServiceClient()
+    # Initialiser le client Artifact Registry
+    client = ar.ArtifactRegistryClient()
 
     try:
-        image_resource = f"projects/{GCP_PROJECT}/locations/{CLOUD_BUILD_REGION}/images/{image_name}@{tag}"
+        # Format du nom de ressource
+        resource_name = f"{GCR_REPO_PATH}/{image_name}@{tag}"
 
-        client.delete_image(name=image_resource)
+        # Supprimer l'image
+        client.delete_docker_image(name=resource_name)
         return {"status": "deleted", "image": full_image_name}
 
     except Exception as e:
-        logger.error(f"Erreur suppression GCR: {str(e)}")
-        raise HTTPException(500, "Erreur de suppression dans GCR")
+        logger.error(f"Erreur suppression Artifact Registry: {str(e)}")
+        raise HTTPException(500, "Erreur de suppression de l'image")
 
 
 @app.post("/generate_deploy_script")
 def generate_deploy_script(p: DeployScriptPayload):
     """Génère le script de déploiement"""
-    image_full = f"{GCR_REPO}/{p.image}"
+    image_full = f"{GCR_REPO_PATH}/{p.image}"
     pull_cmd = f"docker pull {image_full}"
     run_cmd = (
         f"docker run -d --restart unless-stopped "
@@ -275,18 +300,16 @@ def launch_build(qid: str, payload: BuildPayload, user_id: str, context_object: 
     client_options = ClientOptions(
         api_endpoint=f"{CLOUD_BUILD_REGION}-cloudbuild.googleapis.com"
     )
-    cloudbuild_client = cloudbuild_v1.CloudBuildClient(
-        client_options=client_options
-    )  # Correction ici
+    cloudbuild_client = cloudbuild_v1.CloudBuildClient(client_options=client_options)
 
     # Nom de l'image
     image_name = f"user_{user_id}_q_{qid}"
-    image_tag = f"{GCR_REPO}/{image_name}:latest"
+    image_tag = f"{GCR_REPO_PATH}/{image_name}:latest"
 
     # Configuration du build
-    build_config = cloudbuild_v1.Build(  # Correction ici
+    build_config = cloudbuild_v1.Build(
         steps=[
-            cloudbuild_v1.BuildStep(  # Correction ici
+            cloudbuild_v1.BuildStep(
                 name="gcr.io/cloud-builders/docker",
                 args=[
                     "build",
@@ -304,20 +327,18 @@ def launch_build(qid: str, payload: BuildPayload, user_id: str, context_object: 
                 ],
                 dir="custom_build_context",
             ),
-            cloudbuild_v1.BuildStep(  # Correction ici
+            cloudbuild_v1.BuildStep(
                 name="gcr.io/cloud-builders/docker", args=["push", image_tag]
             ),
         ],
-        source=cloudbuild_v1.Source(  # Correction ici
-            storage_source=cloudbuild_v1.StorageSource(  # Correction ici
+        source=cloudbuild_v1.Source(
+            storage_source=cloudbuild_v1.StorageSource(
                 bucket="germina-build-context",
                 object=context_object,
             )
         ),
         images=[image_tag],
-        options=cloudbuild_v1.BuildOptions(  # Correction ici
-            logging="CLOUD_LOGGING_ONLY"
-        ),
+        options=cloudbuild_v1.BuildOptions(logging="CLOUD_LOGGING_ONLY"),
     )
 
     try:
@@ -328,7 +349,7 @@ def launch_build(qid: str, payload: BuildPayload, user_id: str, context_object: 
         result = operation.result()
 
         # Gérer le résultat
-        if result.status == cloudbuild_v1.Build.Status.SUCCESS:  # Correction ici
+        if result.status == cloudbuild_v1.Build.Status.SUCCESS:
             supabase.table("questionnaires").update(
                 {"docker_status": "built", "docker_image": image_tag}
             ).eq("id", qid).eq("user_id", user_id).execute()
