@@ -365,10 +365,39 @@ def launch_build(qid: str, payload: BuildPayload, user_id: str, context_object: 
                 "id", qid
             ).eq("user_id", user_id).execute()
 
-    except Exception as e:
-        error_msg = f"Erreur Cloud Build: {str(e)}"
-        logger.error(error_msg)
-        logger.exception(f"Exception inattendue durant le build de {image_tag}")
+    except Exception:
+        # (3) Stack trace
+        logger.exception("Exception inattendue durant launch_build")
+
+        # (4) Si on a quand même une opération démarrée, extraire le build_id
+        try:
+            metadata = operation.metadata  # BuildOperationMetadata
+            build_id = metadata.build.id or metadata.build_id
+            logger.error(f"Build ID détecté : {build_id}")
+        except Exception:
+            build_id = None
+            logger.warning("Impossible de récupérer build_id depuis l'opération")
+
+        # (5) Appeler get_build pour voir tous les détails
+        if build_id:
+            try:
+                full_build = cloudbuild_client.get_build(
+                    project_id=GCP_PROJECT, id=build_id
+                )
+                # Logger l’URL publique des logs
+                logger.error(f"Logs URI : {full_build.log_uri}")
+                # Logger le statusDetail
+                logger.error(f"Status detail : {full_build.status_detail}")
+                # Logger chaque step pour identifier le plantage
+                for step in full_build.steps or []:
+                    logger.error(
+                        f"Step {step.name} status={step.status.name} "
+                        f"args={step.args}"
+                    )
+            except Exception:
+                logger.exception("Échec de récupération du Build complet")
+
+        # (6) Mettre à jour Supabase si besoin, ou rien
         supabase.table("questionnaires").update({"docker_status": "failed"}).eq(
             "id", qid
         ).eq("user_id", user_id).execute()
