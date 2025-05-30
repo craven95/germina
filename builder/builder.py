@@ -12,10 +12,14 @@ from fastapi.logger import logger
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from google.api_core.client_options import ClientOptions
 from google.cloud import artifactregistry_v1 as ar
+from google.cloud import logging as cloud_logging
 from google.cloud import storage
 from google.cloud.devtools import cloudbuild_v1
 from pydantic import BaseModel
 from supabase import Client, create_client
+
+cloud_logging_client = cloud_logging.Client()
+cloud_logging_client.setup_logging()
 
 load_dotenv()
 
@@ -341,26 +345,29 @@ def launch_build(qid: str, payload: BuildPayload, user_id: str, context_object: 
 
     try:
         # Lancer le build
+        logger.info(f"Lancement du build pour {image_tag}...")
         operation = cloudbuild_client.create_build(
             project_id=GCP_PROJECT, build=build_config
         )
         result = operation.result()
+        logger.info(f"Build terminé : {result.status}")
 
         # Gérer le résultat
         if result.status == cloudbuild_v1.Build.Status.SUCCESS:
+            logger.info(f"Build réussi : {image_tag}")
             supabase.table("questionnaires").update(
                 {"docker_status": "built", "docker_image": image_tag}
             ).eq("id", qid).eq("user_id", user_id).execute()
         else:
             error_msg = f"Build failed: {result.status_detail}"
             logger.error(error_msg)
-            supabase.table("questionnaires").update(
-                {"docker_status": "failed", "docker_error": error_msg}
-            ).eq("id", qid).eq("user_id", user_id).execute()
+            supabase.table("questionnaires").update({"docker_status": "failed"}).eq(
+                "id", qid
+            ).eq("user_id", user_id).execute()
 
     except Exception as e:
         error_msg = f"Erreur Cloud Build: {str(e)}"
         logger.error(error_msg)
-        supabase.table("questionnaires").update(
-            {"docker_status": "failed", "docker_error": error_msg}
-        ).eq("id", qid).eq("user_id", user_id).execute()
+        supabase.table("questionnaires").update({"docker_status": "failed"}).eq(
+            "id", qid
+        ).eq("user_id", user_id).execute()
