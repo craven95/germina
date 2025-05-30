@@ -11,9 +11,9 @@ from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Res
 from fastapi.logger import logger
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from google.api_core.client_options import ClientOptions
-from google.cloud import build_v1
 from google.cloud import container_v1 as gcr
 from google.cloud import storage
+from google.cloud.devtools import cloudbuild_v1
 from pydantic import BaseModel
 from supabase import Client, create_client
 
@@ -275,18 +275,20 @@ def launch_build(qid: str, payload: BuildPayload, user_id: str, context_object: 
     client_options = ClientOptions(
         api_endpoint=f"{CLOUD_BUILD_REGION}-cloudbuild.googleapis.com"
     )
-    cloudbuild_client = build_v1.CloudBuildClient(client_options=client_options)
+    cloudbuild_client = cloudbuild_v1.CloudBuildClient(
+        client_options=client_options
+    )  # Correction ici
 
     # Nom de l'image
     image_name = f"user_{user_id}_q_{qid}"
     image_tag = f"{GCR_REPO}/{image_name}:latest"
 
     # Configuration du build
-    build_config = {
-        "steps": [
-            {
-                "name": "gcr.io/cloud-builders/docker",
-                "args": [
+    build_config = cloudbuild_v1.Build(  # Correction ici
+        steps=[
+            cloudbuild_v1.BuildStep(  # Correction ici
+                name="gcr.io/cloud-builders/docker",
+                args=[
                     "build",
                     "-t",
                     image_tag,
@@ -300,19 +302,23 @@ def launch_build(qid: str, payload: BuildPayload, user_id: str, context_object: 
                     f"Q_TITLE={payload.title}",
                     ".",
                 ],
-                "dir": "custom_build_context",
-            },
-            {"name": "gcr.io/cloud-builders/docker", "args": ["push", image_tag]},
+                dir="custom_build_context",
+            ),
+            cloudbuild_v1.BuildStep(  # Correction ici
+                name="gcr.io/cloud-builders/docker", args=["push", image_tag]
+            ),
         ],
-        "source": {
-            "storage_source": {
-                "bucket": "germina-build-context",
-                "object": context_object,
-            }
-        },
-        "images": [image_tag],
-        "options": {"logging": "CLOUD_LOGGING_ONLY"},
-    }
+        source=cloudbuild_v1.Source(  # Correction ici
+            storage_source=cloudbuild_v1.StorageSource(  # Correction ici
+                bucket="germina-build-context",
+                object=context_object,
+            )
+        ),
+        images=[image_tag],
+        options=cloudbuild_v1.BuildOptions(  # Correction ici
+            logging="CLOUD_LOGGING_ONLY"
+        ),
+    )
 
     try:
         # Lancer le build
@@ -322,7 +328,7 @@ def launch_build(qid: str, payload: BuildPayload, user_id: str, context_object: 
         result = operation.result()
 
         # Gérer le résultat
-        if result.status == build_v1.Build.Status.SUCCESS:
+        if result.status == cloudbuild_v1.Build.Status.SUCCESS:  # Correction ici
             supabase.table("questionnaires").update(
                 {"docker_status": "built", "docker_image": image_tag}
             ).eq("id", qid).eq("user_id", user_id).execute()
