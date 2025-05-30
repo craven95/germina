@@ -33,7 +33,7 @@ jobs:
 
       - name: Build & Push Docker image
         env:
-          IMAGE: europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/germina-backend/builder:${{ github.sha }}
+          IMAGE: europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/germina-backend/builder:latest
         run: |
           docker build -t $IMAGE builder/
           docker push $IMAGE
@@ -41,7 +41,7 @@ jobs:
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy builder \
-            --image europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/germina-backend/builder:${{ github.sha }} \
+            --image europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/germina-backend/builder:latest \
             --region europe-west1 \
             --platform managed \
             --allow-unauthenticated

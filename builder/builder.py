@@ -1,24 +1,19 @@
 import json
 import os
 import shutil
+import tarfile
 import tempfile
 from pathlib import Path
 from typing import Optional
 
-import docker
-import requests
 from dotenv import load_dotenv
-from fastapi import (
-    BackgroundTasks,
-    Depends,
-    FastAPI,
-    HTTPException,
-    Query,
-    Response,
-    status,
-)
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Response
 from fastapi.logger import logger
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from google.api_core.client_options import ClientOptions
+from google.cloud import build_v1
+from google.cloud import container_v1 as gcr
+from google.cloud import storage
 from pydantic import BaseModel
 from supabase import Client, create_client
 
@@ -26,37 +21,71 @@ load_dotenv()
 
 from fastapi.middleware.cors import CORSMiddleware
 
-SCW_REGION = "fr-par"
-SCW_API_BASE = f"https://api.scaleway.com/registry/v1/regions/{SCW_REGION}"
-SCW_NAMESPACE_ID = "a19516b3-bd56-4d61-8df6-2833cfd5324c"
-SCW_REGISTRY_DOMAIN = "rg.fr-par.scw.cloud"
-SCW_REGISTRY_NS = "germina-namespace"
-SCW_SECRET_KEY = os.getenv("SCW_SECRET_KEY", "")
+# Configuration Google Cloud
+GCP_PROJECT = "germina-461108"
+CLOUD_BUILD_REGION = "europe-west1"
+GCR_REGISTRY = "gcr.io"
+GCR_REPO = GCR_REGISTRY + "/" + GCP_PROJECT
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
-    print(
-        "Erreur : Les variables d'environnement SUPABASE_URL et SUPABASE_KEY doivent être définies."
-        " Veuillez les configurer dans votre fichier .env."
-    )
-
-if not SCW_SECRET_KEY:
-    print(
-        "Erreur : La variable d'environnement SCW_SECRET_KEY doit être définie."
-        " Veuillez la configurer dans votre fichier .env."
-    )
-
+    logger.error("Erreur : SUPABASE_URL et SUPABASE_KEY doivent être définis dans .env")
+    raise RuntimeError("Configuration Supabase manquante")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-docker_client = docker.from_env()
 
 security = HTTPBearer()
 
+# Middleware CORS
+app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
+
+
+class BuildPayload(BaseModel):
+    user_id: str
+    title: str
+    schema: dict
+    ui_schema: dict
+
+
+class DeployScriptPayload(BaseModel):
+    image: str
+    port: Optional[int] = 5000
+    volume_path: Optional[str] = "~/docker_data"
+    os: str
+    qid: Optional[str] = "unknown"
+
+
+def prepare_build_context(qid: str, user_id: str) -> str:
+    """Prépare et upload le contexte de build vers GCS"""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        base = Path(__file__).parent / "survey_template"
+        build_dir = Path(tmp_dir) / "custom_build_context"
+        shutil.copytree(base, build_dir, dirs_exist_ok=True)
+
+        archive_name = f"context_{qid}_{user_id}.tar.gz"
+        archive_path = Path(tmp_dir) / archive_name
+        with tarfile.open(archive_path, "w:gz") as tar:
+            tar.add(build_dir, arcname=".")
+
+        storage_client = storage.Client()
+        bucket = storage_client.bucket("germina-build-context")
+        blob = bucket.blob(archive_name)
+        blob.upload_from_filename(archive_path)
+
+    return archive_name
+
 
 def get_current_user(creds: HTTPAuthorizationCredentials = Depends(security)):
-    """Récupère l'utilisateur via token Supabase et vérifie le quota d'usage."""
+    """Récupère l'utilisateur via token Supabase"""
     token = creds.credentials
     try:
         user = supabase.auth.get_user(token).user
@@ -75,18 +104,17 @@ def get_current_user(creds: HTTPAuthorizationCredentials = Depends(security)):
     )
     current = stat["count"] if stat else 0
     if current >= 605:
-        raise HTTPException(status_code=429, detail="Quota d’usage dépassé")
+        raise HTTPException(status_code=429, detail="Quota dépassé")
+
     supabase.table("api_usage").upsert(
         {"user_id": user.id, "count": current + 1}
     ).execute()
-    supabase.auth.session = {"access_token": token}
+
     return user
 
 
 def check_registry_access(user_id: str, questionnaire_id: str):
-    """
-    S'assure que le questionnaire appartient bien à l'utilisateur.
-    """
+    """Vérifie les droits sur le questionnaire"""
     rec = (
         supabase.table("questionnaires")
         .select("id")
@@ -98,63 +126,12 @@ def check_registry_access(user_id: str, questionnaire_id: str):
     )
     if not rec:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=403,
             detail="Accès refusé : questionnaire non trouvé ou pas à vous.",
         )
 
 
-class BuildPayload(BaseModel):
-    user_id: str
-    title: str
-    schema: dict
-    ui_schema: dict
-
-
-class DeployScriptPayload(BaseModel):
-    image: str
-    port: Optional[int] = 5000
-    volume_path: Optional[str] = "~/docker_data"
-    os: str
-    qid: Optional[str] = "unknown"
-
-
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-)
-
-
-@app.on_event("startup")
-def docker_login():
-    """Login dans le SCR au démarrage."""
-    try:
-        docker_client.login(
-            username="nologin",
-            password=SCW_SECRET_KEY,
-            registry=f"{SCW_REGISTRY_DOMAIN}/{SCW_REGISTRY_NS}",
-        )
-    except docker.errors.APIError as e:
-        logger.error(f"Erreur de connexion au registre : {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="Erreur de connexion au registre",
-        )
-    except Exception as e:
-        logger.error(f"Erreur inattendue : {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="Erreur inattendue",
-        )
-
-
-# ————— Routes —————
-
-
+# Routes API
 @app.post("/build/{questionnaire_id}", status_code=202)
 def build_image(
     questionnaire_id: str,
@@ -162,12 +139,11 @@ def build_image(
     bg: BackgroundTasks,
     user=Depends(get_current_user),
 ):
-    # TODO : For the moment user cannot updata supabese tableor read them..
+    context_object = prepare_build_context(questionnaire_id, user.id)
     supabase.table("questionnaires").update(
         {"docker_status": "pending", "docker_image": None}
     ).eq("id", questionnaire_id).eq("user_id", user.id).execute()
-
-    bg.add_task(launch_build, questionnaire_id, payload, user.id)
+    bg.add_task(launch_build, questionnaire_id, payload, user.id, context_object)
     return {"status": "pending", "questionnaire_id": questionnaire_id}
 
 
@@ -189,27 +165,30 @@ def build_status(questionnaire_id: str = Query(...), user=Depends(get_current_us
 
 @app.get("/list")
 def list_images(questionnaire_id: str, user=Depends(get_current_user)):
-    prefix = f"user_{user.id}_q_{questionnaire_id}"
-    headers = {"X-Auth-Token": SCW_SECRET_KEY}
-    resp = requests.get(
-        f"{SCW_API_BASE}/images",
-        headers=headers,
-        params={"namespace_id": SCW_NAMESPACE_ID, "order_by": "created_at_desc"},
-    )
-    resp.raise_for_status()
+    """Liste les images dans GCR pour le questionnaire"""
+    image_prefix = f"user_{user.id}_q_{questionnaire_id}"
 
-    out = []
-    for img in resp.json().get("images", []):
-        if img["name"].startswith(prefix):
-            for tag in img.get("tags", []):
-                out.append(
+    client = gcr.ImageServiceClient()
+    parent = f"projects/{GCP_PROJECT}/locations/{CLOUD_BUILD_REGION}"
+
+    images = []
+    try:
+        for image in client.list_images(parent=parent):
+            if image.uri.startswith(f"{GCR_REPO}/{image_prefix}"):
+                # Extraire le tag de l'URI
+                tag = image.uri.split(":")[-1] if ":" in image.uri else "latest"
+                images.append(
                     {
-                        "name": f"{img['name']}:{tag}",
+                        "name": image.uri,
                         "tag": tag,
-                        "updated_at": img.get("updated_at"),
+                        "updated_at": image.update_time.isoformat(),
                     }
                 )
-    return {"images": out}
+    except Exception as e:
+        logger.error(f"Erreur GCR: {str(e)}")
+        raise HTTPException(500, "Erreur de listing GCR")
+
+    return {"images": images}
 
 
 @app.delete("/delete_image", status_code=200)
@@ -218,38 +197,27 @@ def delete_image(
     tag: str = Query(...),
     user=Depends(get_current_user),
 ):
-    prefix = f"user_{user.id}_q_{questionnaire_id}"
-    headers = {"X-Auth-Token": SCW_SECRET_KEY}
-    resp = requests.get(
-        f"{SCW_API_BASE}/images",
-        headers=headers,
-        params={"namespace_id": SCW_NAMESPACE_ID},
-    )
-    resp.raise_for_status()
-    images = resp.json().get("images", [])
-    image_id = None
-    for img in images:
-        if img["name"] == prefix:
-            image_id = img["id"]
-            break
+    """Supprime une image dans GCR"""
+    image_name = f"user_{user.id}_q_{questionnaire_id}"
+    full_image_name = f"{GCR_REPO}/{image_name}:{tag}"
 
-    if not image_id:
-        raise HTTPException(status_code=404, detail="Image non trouvée")
+    client = gcr.ImageServiceClient()
 
-    del_url = f"{SCW_API_BASE}/images/{image_id}"
-    del_resp = requests.delete(del_url, headers=headers)
-    if del_resp.status_code not in (200, 204):
-        raise HTTPException(
-            status_code=del_resp.status_code,
-            detail=f"Erreur suppression: {del_resp.text}",
-        )
+    try:
+        image_resource = f"projects/{GCP_PROJECT}/locations/{CLOUD_BUILD_REGION}/images/{image_name}@{tag}"
 
-    return {"status": "deleted", "image_id": image_id}
+        client.delete_image(name=image_resource)
+        return {"status": "deleted", "image": full_image_name}
+
+    except Exception as e:
+        logger.error(f"Erreur suppression GCR: {str(e)}")
+        raise HTTPException(500, "Erreur de suppression dans GCR")
 
 
 @app.post("/generate_deploy_script")
 def generate_deploy_script(p: DeployScriptPayload):
-    image_full = f"{SCW_REGISTRY_DOMAIN}/{SCW_REGISTRY_NS}/{p.image}"
+    """Génère le script de déploiement"""
+    image_full = f"{GCR_REPO}/{p.image}"
     pull_cmd = f"docker pull {image_full}"
     run_cmd = (
         f"docker run -d --restart unless-stopped "
@@ -258,20 +226,41 @@ def generate_deploy_script(p: DeployScriptPayload):
     )
 
     if p.os == "linux":
-        shebang = "#!/bin/bash"
-        install = f"{pull_cmd}\nif ! command -v docker; then sudo apt update && sudo apt install -y docker.io; fi"
-        footer = f'echo "Accès : http://localhost:{p.port}"'
+        script = f"""#!/bin/bash
+{pull_cmd}
+if ! command -v docker &> /dev/null; then
+    sudo apt update && sudo apt install -y docker.io
+    sudo systemctl start docker
+    sudo systemctl enable docker
+fi
+{run_cmd}
+echo "Accès : http://localhost:{p.port}"
+"""
+        ext = "sh"
     elif p.os == "mac":
-        shebang = "#!/bin/zsh"
-        install = f"{pull_cmd}\nif ! docker info; then open -a Docker; exit 1; fi"
-        footer = f'echo "http://localhost:{p.port}"'
+        script = f"""#!/bin/zsh
+{pull_cmd}
+if ! docker info &> /dev/null; then
+    open -a Docker
+    echo "Docker démarre... patientez 30s"
+    sleep 30
+fi
+{run_cmd}
+echo "Accès : http://localhost:{p.port}"
+"""
+        ext = "sh"
     else:  # windows
-        shebang = ""
-        install = f"{pull_cmd}\nif (-not (Get-Command docker -ErrorAction SilentlyContinue)) {{ winget install Docker.DockerDesktop }}"
-        footer = f'Write-Host "http://localhost:{p.port}"'
+        script = f"""# PowerShell
+{pull_cmd}
+if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {{
+    winget install Docker.DockerDesktop
+    Start-Sleep -Seconds 30
+}}
+{run_cmd}
+Write-Host "Accès : http://localhost:{p.port}"
+"""
+        ext = "ps1"
 
-    script = "\n".join(filter(None, [shebang, install, run_cmd, footer]))
-    ext = "ps1" if p.os == "windows" else "sh"
     return Response(
         script,
         media_type="text/plain",
@@ -279,37 +268,74 @@ def generate_deploy_script(p: DeployScriptPayload):
     )
 
 
-def launch_build(qid: str, payload: BuildPayload, user_id: str):
-    tmp = tempfile.mkdtemp()
-    try:
-        base = Path(__file__).parent / "survey_template"
-        shutil.copytree(base, tmp, dirs_exist_ok=True)
+# Fonction de build principale
+def launch_build(qid: str, payload: BuildPayload, user_id: str, context_object: str):
+    """Lance le build via Google Cloud Build"""
+    # Configuration du client Cloud Build
+    client_options = ClientOptions(
+        api_endpoint=f"{CLOUD_BUILD_REGION}-cloudbuild.googleapis.com"
+    )
+    cloudbuild_client = build_v1.CloudBuildClient(client_options=client_options)
 
-        remote = f"{SCW_REGISTRY_DOMAIN}/{SCW_REGISTRY_NS}/user_{user_id}_q_{qid}"
-        remote_tag = f"{remote}:latest"
+    # Nom de l'image
+    image_name = f"user_{user_id}_q_{qid}"
+    image_tag = f"{GCR_REPO}/{image_name}:latest"
 
-        image, logs = docker_client.images.build(
-            path=tmp,
-            tag=remote_tag,
-            buildargs={
-                "Q_SCHEMA": json.dumps(payload.schema),
-                "Q_UI_SCHEMA": json.dumps(payload.ui_schema),
-                "Q_ID": qid,
-                "Q_TITLE": payload.title,
+    # Configuration du build
+    build_config = {
+        "steps": [
+            {
+                "name": "gcr.io/cloud-builders/docker",
+                "args": [
+                    "build",
+                    "-t",
+                    image_tag,
+                    "--build-arg",
+                    f"Q_SCHEMA={json.dumps(payload.schema)}",
+                    "--build-arg",
+                    f"Q_UI_SCHEMA={json.dumps(payload.ui_schema)}",
+                    "--build-arg",
+                    f"Q_ID={qid}",
+                    "--build-arg",
+                    f"Q_TITLE={payload.title}",
+                    ".",
+                ],
+                "dir": "custom_build_context",
             },
-            rm=True,
+            {"name": "gcr.io/cloud-builders/docker", "args": ["push", image_tag]},
+        ],
+        "source": {
+            "storage_source": {
+                "bucket": "germina-build-context",
+                "object": context_object,
+            }
+        },
+        "images": [image_tag],
+        "options": {"logging": "CLOUD_LOGGING_ONLY"},
+    }
+
+    try:
+        # Lancer le build
+        operation = cloudbuild_client.create_build(
+            project_id=GCP_PROJECT, build=build_config
         )
+        result = operation.result()
 
-        for chunk in docker_client.images.push(
-            remote, tag="latest", stream=True, decode=True
-        ):
-            logger.info(chunk)
-
-        logger.info("Image envoyée au registre")
-        docker_client.images.remove(remote_tag, force=True)
-        logger.info("Image supprimée localement")
+        # Gérer le résultat
+        if result.status == build_v1.Build.Status.SUCCESS:
+            supabase.table("questionnaires").update(
+                {"docker_status": "built", "docker_image": image_tag}
+            ).eq("id", qid).eq("user_id", user_id).execute()
+        else:
+            error_msg = f"Build failed: {result.status_detail}"
+            logger.error(error_msg)
+            supabase.table("questionnaires").update(
+                {"docker_status": "failed", "docker_error": error_msg}
+            ).eq("id", qid).eq("user_id", user_id).execute()
 
     except Exception as e:
-        logger.error(f"Erreur lors de la construction de l'image : {e}")
-    finally:
-        shutil.rmtree(tmp)
+        error_msg = f"Erreur Cloud Build: {str(e)}"
+        logger.error(error_msg)
+        supabase.table("questionnaires").update(
+            {"docker_status": "failed", "docker_error": error_msg}
+        ).eq("id", qid).eq("user_id", user_id).execute()
