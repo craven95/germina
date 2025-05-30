@@ -368,6 +368,7 @@ def launch_build(qid: str, payload: BuildPayload, user_id: str, context_object: 
     except Exception as e:
         error_msg = f"Erreur Cloud Build: {str(e)}"
         logger.error(error_msg)
+        logger.exception(f"Exception inattendue durant le build de {image_tag}")
         supabase.table("questionnaires").update({"docker_status": "failed"}).eq(
             "id", qid
         ).eq("user_id", user_id).execute()
