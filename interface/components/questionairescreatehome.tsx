@@ -27,7 +27,7 @@ export default function QuestionnairesCreateHome({ questionnaires }: Questionnai
     setError(null);
 
     try {
-      const builderApiUrl = process.env.NEXT_PUBLIC_BUILDER_API_URL || 'http://localhost:5000';
+      const builderApiUrl = process.env.NEXT_PUBLIC_BUILDER_API_URL || 'http://localhost:8000';
       const token = (await supabase.auth.getSession()).data.session?.access_token;
       if (token) {
         const delImg = await fetch(

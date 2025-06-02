@@ -198,12 +198,12 @@ def list_images(questionnaire_id: str, user=Depends(get_current_user)):
         request = ar.ListDockerImagesRequest(parent=parent)
         page_result = client.list_docker_images(request=request)
         for image in page_result:
-            image_name = image.uri.split("/")[-1].split(":")[0]
+            image_name = image.uri.split("/")[-1].split("@")[0]
             if image_name.startswith(image_prefix):
                 for tag in image.tags:
                     images.append(
                         {
-                            "name": f"{image_name}:{tag}",
+                            "name": f"{image_name}",
                             "tag": tag,
                             "updated_at": image.upload_time.strftime(
                                 "%Y-%m-%dT%H:%M:%SZ"

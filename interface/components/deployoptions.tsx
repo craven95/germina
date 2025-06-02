@@ -16,18 +16,19 @@ const DeployOptions = ({ image, onClose }: DeployOptionsProps) => {
     key: '',
     port: 22,
   })
+  const builderApiUrl = process.env.NEXT_PUBLIC_BUILDER_API_URL || 'http://localhost:8000';
 
   const handleDeploy = async () => {
     try {
       if (deployType === 'local') {
         console.log('Déploiement LOCAL sur', osType)
-        const res = await fetch('${builderApiUrl}/generate_deploy_script', {
+        const res = await fetch(`${builderApiUrl}/generate_deploy_script`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             image: image.name,
             os: osType,
-            port: 8000,
+            port: 5000,
             qid: image.name,
           }),
         })

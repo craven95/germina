@@ -20,5 +20,5 @@ COPY app.py ./
 COPY templates ./templates
 COPY static ./static
 
-EXPOSE 8000
+EXPOSE 5000
 CMD ["python", "app.py"]
