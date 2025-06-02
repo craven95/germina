@@ -11,6 +11,8 @@ export default function NewQuestionnaire() {
   const [title, setTitle] = useState('');
   const [saving, setSaving] = useState(false);
 
+  const QUESTIONNAIRE_LIMIT = 5;
+
   const handleCreate = async () => {
     if (!title.trim()) {
       alert('Merci de saisir un titre');
@@ -22,6 +24,24 @@ export default function NewQuestionnaire() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         router.push('/sign-in');
+        return;
+      }
+
+      const { count, error: countError } = await supabase
+        .from('questionnaires')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+
+      if (countError) {
+        console.error('Erreur lors du comptage des questionnaires :', countError);
+        alert('Impossible de vérifier le nombre de questionnaires. Veuillez réessayer.');
+        setSaving(false);
+        return;
+      }
+
+      if ((count ?? 0) >= QUESTIONNAIRE_LIMIT) {
+        alert(`Vous ne pouvez pas créer plus de ${QUESTIONNAIRE_LIMIT} questionnaires.`);
+        setSaving(false);
         return;
       }
 
