@@ -119,6 +119,28 @@ def get_current_user(creds: HTTPAuthorizationCredentials = Depends(security)):
     return user
 
 
+def get_user_images(user_id: str):
+    """Récupère les images Docker de l'utilisateur depuis Artifact Registry"""
+    client = ar.ArtifactRegistryClient()
+    parent = (
+        f"projects/{GCP_PROJECT}/locations/{GCR_LOCATION}/repositories/{GCR_REPOSITORY}"
+    )
+    images = []
+    try:
+        request = ar.ListDockerImagesRequest(parent=parent)
+        page_result = client.list_docker_images(request=request)
+        for image in page_result:
+            image_name = image.uri.split("/")[-1].split(":")[0]
+            if image_name.startswith(f"user_{user_id}_q_"):
+                print(f"Image trouvée : {image.uri}")
+                images.append(image)
+    except Exception as e:
+        logger.error(f"Erreur Artifact Registry: {str(e)}")
+        raise HTTPException(500, "Erreur de listing des images")
+
+    return images
+
+
 # Routes API
 @app.post("/build/{questionnaire_id}", status_code=202)
 def build_image(
@@ -127,6 +149,14 @@ def build_image(
     bg: BackgroundTasks,
     user=Depends(get_current_user),
 ):
+    # check if user can build
+    total_users_images = get_user_images(user.id)
+    print('User has already', total_users_images)
+    if len(total_users_images) >= 2:
+        raise HTTPException(
+            status_code=429,
+            detail="Vous avez atteint la limite de 2 interfaces, supprimez-en une pour en créer une nouvelle.",
+        )
     context_object = prepare_build_context(questionnaire_id, user.id)
 
     supabase.table("questionnaires").update(
@@ -170,15 +200,16 @@ def list_images(questionnaire_id: str, user=Depends(get_current_user)):
         for image in page_result:
             image_name = image.uri.split("/")[-1].split(":")[0]
             if image_name.startswith(image_prefix):
-                print(f"Image trouvée : {image.uri}")
-            for tag in image.tags:
-                images.append(
-                    {
-                        "name": f"{image_name}:{tag}",
-                        "tag": tag,
-                        "updated_at": image.upload_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    }
-                )
+                for tag in image.tags:
+                    images.append(
+                        {
+                            "name": f"{image_name}:{tag}",
+                            "tag": tag,
+                            "updated_at": image.upload_time.strftime(
+                                "%Y-%m-%dT%H:%M:%SZ"
+                            ),
+                        }
+                    )
     except Exception as e:
         logger.error(f"Erreur Artifact Registry: {str(e)}")
         raise HTTPException(500, "Erreur de listing des images")

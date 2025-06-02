@@ -95,7 +95,10 @@ export default function DeploiementPage({ params }: DeploiementProps) {
           body: JSON.stringify({ user_id: user!.id, title, schema: schemaJson, ui_schema: uiSchemaJson })
         }
       );
-      if (!resp.ok) throw new Error('Erreur au démarrage du build');
+      if (!resp.ok) {
+        const errorData = await resp.json();
+        throw new Error(errorData.detail || 'Erreur au démarrage du build');
+      }
 
       const start = Date.now();
       const poll = async () => {
