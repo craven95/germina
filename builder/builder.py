@@ -1,14 +1,19 @@
 import json
 import os
 import shutil
+import subprocess
 import tarfile
 import tempfile
 from pathlib import Path
 from typing import Optional
 
 from dotenv import load_dotenv
+
+load_dotenv()
+
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Response
 from fastapi.logger import logger
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from google.api_core.client_options import ClientOptions
 from google.cloud import artifactregistry_v1 as ar
@@ -21,11 +26,6 @@ from supabase import Client, create_client
 cloud_logging_client = cloud_logging.Client()
 cloud_logging_client.setup_logging()
 
-load_dotenv()
-
-from fastapi.middleware.cors import CORSMiddleware
-
-# Configuration Google Cloud
 GCP_PROJECT = "germina-461108"
 CLOUD_BUILD_REGION = "europe-west1"
 GCR_LOCATION = "europe-west1"  # Location for Artifact Registry
@@ -70,22 +70,18 @@ class DeployScriptPayload(BaseModel):
     qid: Optional[str] = "unknown"
 
 
-# Fonctions utilitaires
 def prepare_build_context(qid: str, user_id: str) -> str:
     """Prépare et upload le contexte de build vers GCS"""
     with tempfile.TemporaryDirectory() as tmp_dir:
-        # Copier le template
         base = Path(__file__).parent / "survey_template"
         build_dir = Path(tmp_dir) / "custom_build_context"
         shutil.copytree(base, build_dir, dirs_exist_ok=True)
-
-        # Créer une archive
+        print(list(build_dir.iterdir()))
         archive_name = f"context_{qid}_{user_id}.tar.gz"
         archive_path = Path(tmp_dir) / archive_name
         with tarfile.open(archive_path, "w:gz") as tar:
-            tar.add(build_dir, arcname=".")
+            tar.add(build_dir, arcname="custom_build_context")
 
-        # Upload vers GCS
         storage_client = storage.Client()
         bucket = storage_client.bucket("germina-build-context")
         blob = bucket.blob(archive_name)
@@ -104,7 +100,6 @@ def get_current_user(creds: HTTPAuthorizationCredentials = Depends(security)):
     except:
         raise HTTPException(status_code=401, detail="Token invalide")
 
-    # Vérification du quota
     stat = (
         supabase.table("api_usage")
         .select("count")
@@ -114,34 +109,14 @@ def get_current_user(creds: HTTPAuthorizationCredentials = Depends(security)):
         .data
     )
     current = stat["count"] if stat else 0
-    if current >= 605:
+    if current >= 1000:
         raise HTTPException(status_code=429, detail="Quota dépassé")
 
-    # Mise à jour du quota
     supabase.table("api_usage").upsert(
         {"user_id": user.id, "count": current + 1}
     ).execute()
 
     return user
-
-
-# TODO : # Vérification des droits d'accès au questionnaire
-# def check_registry_access(user_id: str, questionnaire_id: str):
-#     """Vérifie les droits sur le questionnaire"""
-#     rec = (
-#         supabase.table("questionnaires")
-#         .select("id")
-#         .eq("id", questionnaire_id)
-#         .eq("user_id", user_id)
-#         .maybe_single()
-#         .execute()
-#         .data
-#     )
-#     if not rec:
-#         raise HTTPException(
-#             status_code=403,
-#             detail="Accès refusé : questionnaire non trouvé ou pas à vous.",
-#         )
 
 
 # Routes API
@@ -152,15 +127,12 @@ def build_image(
     bg: BackgroundTasks,
     user=Depends(get_current_user),
 ):
-    # Préparer le contexte
     context_object = prepare_build_context(questionnaire_id, user.id)
 
-    # Mettre à jour le statut
     supabase.table("questionnaires").update(
         {"docker_status": "pending", "docker_image": None}
     ).eq("id", questionnaire_id).eq("user_id", user.id).execute()
 
-    # Lancer le build
     bg.add_task(launch_build, questionnaire_id, payload, user.id, context_object)
     return {"status": "pending", "questionnaire_id": questionnaire_id}
 
@@ -186,13 +158,11 @@ def list_images(questionnaire_id: str, user=Depends(get_current_user)):
     """Liste les images dans Artifact Registry pour le questionnaire"""
     image_prefix = f"user_{user.id}_q_{questionnaire_id}"
 
-    # Initialiser le client Artifact Registry
     client = ar.ArtifactRegistryClient()
     parent = (
         f"projects/{GCP_PROJECT}/locations/{GCR_LOCATION}/repositories/{GCR_REPOSITORY}"
     )
 
-    # Lister les images
     images = []
     try:
         request = ar.ListDockerImagesRequest(parent=parent)
@@ -200,10 +170,11 @@ def list_images(questionnaire_id: str, user=Depends(get_current_user)):
         for image in page_result:
             image_name = image.uri.split("/")[-1].split(":")[0]
             if image_name.startswith(image_prefix):
-                tag = image.uri.split(":")[-1] if ":" in image.uri else "latest"
+                print(f"Image trouvée : {image.uri}")
+            for tag in image.tags:
                 images.append(
                     {
-                        "name": image.uri,
+                        "name": f"{image_name}:{tag}",
                         "tag": tag,
                         "updated_at": image.upload_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     }
@@ -218,27 +189,51 @@ def list_images(questionnaire_id: str, user=Depends(get_current_user)):
 @app.delete("/delete_image", status_code=200)
 def delete_image(
     questionnaire_id: str = Query(...),
-    tag: str = Query(...),
     user=Depends(get_current_user),
 ):
-    """Supprime une image dans Artifact Registry"""
-    image_name = f"user_{user.id}_q_{questionnaire_id}"
-    full_image_name = f"{GCR_REPO_PATH}/{image_name}:{tag}"
-
-    # Initialiser le client Artifact Registry
+    image_prefix = f"user_{user.id}_q_{questionnaire_id}"
+    parent = (
+        f"projects/{GCP_PROJECT}/locations/{GCR_LOCATION}/repositories/{GCR_REPOSITORY}"
+    )
     client = ar.ArtifactRegistryClient()
-
+    # Lister les images
+    to_delete = []
     try:
-        # Format du nom de ressource
-        resource_name = f"{GCR_REPO_PATH}/{image_name}@{tag}"
+        request = ar.ListDockerImagesRequest(parent=parent)
+        page_result = client.list_docker_images(request=request)
+        for image in page_result:
+            image_name = image.uri.split("/")[-1].split(":")[0]
+            if image_name.startswith(image_prefix):
+                print(f"Image trouvée : {image.uri}")
+                to_delete.append(image.uri)
 
-        # Supprimer l'image
-        client.delete_docker_image(name=resource_name)
-        return {"status": "deleted", "image": full_image_name}
+        print(f"Images trouvées : {len(to_delete)}")
+        # Filtre les images correspondant au préfixe
+        images_to_delete = [name for name in to_delete if image_prefix in name]
+        print(f"Images à supprimer : {images_to_delete}")
+        # Supprime chaque image trouvée
+        for image in images_to_delete:
+            delete_command = [
+                "gcloud",
+                "artifacts",
+                "docker",
+                "images",
+                "delete",
+                f"{image}",
+                "--delete-tags",
+                "--quiet",
+            ]
+            subprocess.run(delete_command, check=True)
 
+        return {"status": "success", "deleted_images": images_to_delete}
+
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de la suppression des images : {e.stderr}",
+        )
     except Exception as e:
-        logger.error(f"Erreur suppression Artifact Registry: {str(e)}")
-        raise HTTPException(500, "Erreur de suppression de l'image")
+        raise HTTPException(status_code=500, detail=f"Erreur interne : {str(e)}")
 
 
 @app.post("/generate_deploy_script")
@@ -344,15 +339,17 @@ def launch_build(qid: str, payload: BuildPayload, user_id: str, context_object: 
     )
 
     try:
-        # Lancer le build
+        print(f"prépa fini pour {image_tag}...")
         logger.info(f"Lancement du build pour {image_tag}...")
         operation = cloudbuild_client.create_build(
             project_id=GCP_PROJECT, build=build_config
         )
+        print("Build lancé, en attente du résultat...")
         result = operation.result()
+        print("Build terminé, traitement du résultat...")
         logger.info(f"Build terminé : {result.status}")
+        print(result.status_detail)
 
-        # Gérer le résultat
         if result.status == cloudbuild_v1.Build.Status.SUCCESS:
             logger.info(f"Build réussi : {image_tag}")
             supabase.table("questionnaires").update(
@@ -365,39 +362,11 @@ def launch_build(qid: str, payload: BuildPayload, user_id: str, context_object: 
                 "id", qid
             ).eq("user_id", user_id).execute()
 
-    except Exception:
-        # (3) Stack trace
+    except Exception as e:
+        print("Exception inattendue durant launch_build", e)
         logger.exception("Exception inattendue durant launch_build")
 
-        # (4) Si on a quand même une opération démarrée, extraire le build_id
-        try:
-            metadata = operation.metadata  # BuildOperationMetadata
-            build_id = metadata.build.id or metadata.build_id
-            logger.error(f"Build ID détecté : {build_id}")
-        except Exception:
-            build_id = None
-            logger.warning("Impossible de récupérer build_id depuis l'opération")
-
-        # (5) Appeler get_build pour voir tous les détails
-        if build_id:
-            try:
-                full_build = cloudbuild_client.get_build(
-                    project_id=GCP_PROJECT, id=build_id
-                )
-                # Logger l’URL publique des logs
-                logger.error(f"Logs URI : {full_build.log_uri}")
-                # Logger le statusDetail
-                logger.error(f"Status detail : {full_build.status_detail}")
-                # Logger chaque step pour identifier le plantage
-                for step in full_build.steps or []:
-                    logger.error(
-                        f"Step {step.name} status={step.status.name} "
-                        f"args={step.args}"
-                    )
-            except Exception:
-                logger.exception("Échec de récupération du Build complet")
-
-        # (6) Mettre à jour Supabase si besoin, ou rien
         supabase.table("questionnaires").update({"docker_status": "failed"}).eq(
             "id", qid
         ).eq("user_id", user_id).execute()
+        raise HTTPException(status_code=500, detail="Erreur lors du lancement du build")
