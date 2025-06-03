@@ -98,21 +98,21 @@ def get_current_user(creds: HTTPAuthorizationCredentials = Depends(security)):
     except:
         raise HTTPException(status_code=401, detail="Token invalide")
 
-    stat = (
-        supabase.table("api_usage")
-        .select("count")
-        .eq("user_id", user.id)
-        .maybe_single()
-        .execute()
-        .data
-    )
-    current = stat["count"] if stat else 0
-    if current >= 1000:
-        raise HTTPException(status_code=429, detail="Quota dépassé")
+    # stat = (
+    #     supabase.table("api_usage")
+    #     .select("count")
+    #     .eq("user_id", user.id)
+    #     .maybe_single()
+    #     .execute()
+    #     .data
+    # )
+    # current = stat["count"] if stat else 0
+    # if current >= 1000:
+    #     raise HTTPException(status_code=429, detail="Quota dépassé")
 
-    supabase.table("api_usage").upsert(
-        {"user_id": user.id, "count": current + 1}
-    ).execute()
+    # supabase.table("api_usage").upsert(
+    #     {"user_id": user.id, "count": current + 1}
+    # ).execute()
 
     return user
 

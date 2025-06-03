@@ -3,6 +3,7 @@
 import Ajv from 'ajv';
 import { applyPatch, Operation } from 'rfc6902';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createClient } from '@/utils/supabase/client';
 
 import Lottie from 'lottie-react';
 import waveAnimation from './animations/cat_waiting.json';
@@ -37,7 +38,9 @@ export default function ChatAssistant({
   const [messages, setMessages] = useState<Message[]>([]);
   const initialized = useRef(false)
 
-
+  const supabase = createClient();
+  const BOT_LIMIT = 100;
+  
   const validatePatch = (patches: any): patches is Operation[] => {
     return Array.isArray(patches) && patches.every(op => 
       op && typeof op === 'object' &&
@@ -96,6 +99,45 @@ const applySafeModifications = useCallback(
     setInput('');
 
     try {
+      const {
+        data: { user },
+        error: userError
+      } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error('Utilisateur non authentifié');
+      }
+
+      const { data: usageData, error: usageError } = await supabase
+        .from('api_usage')
+        .select('count')
+        .eq('user_id', user.id);
+      if (usageError) {
+        console.error('Erreur lors de la lecture de api_usage:', usageError);
+        throw new Error('Impossible de vérifier le quota');
+      }
+      console.log('Usage data:', usageData);
+      const currentCount = usageData?.[0]?.count || 0;
+      console.log('Current API usage count:', currentCount);
+
+      if (currentCount >= BOT_LIMIT) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'assistant',
+            content:
+              "Désolé, le quota est dépassé. Veuillez contacter le support pour obtenir plus de crédits."
+          }
+        ]);
+        return;
+      }
+      const { error: upsertError } = await supabase
+        .from('api_usage')
+        .upsert({ user_id: user.id, count: currentCount + 1 });
+      if (upsertError) {
+        console.error('Erreur lors de la mise à jour de api_usage:', upsertError);
+      }
+
+
       console.log('Sending message to assistant:', userMessage);
       const response = await fetch('/api/chat', {
         method: 'POST',
