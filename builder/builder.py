@@ -1,7 +1,6 @@
 import json
 import os
 import shutil
-import subprocess
 import tarfile
 import tempfile
 from pathlib import Path
@@ -27,8 +26,7 @@ cloud_logging_client = cloud_logging.Client()
 cloud_logging_client.setup_logging()
 
 GCP_PROJECT = "germina-461108"
-CLOUD_BUILD_REGION = "europe-west1"
-GCR_LOCATION = "europe-west1"  # Location for Artifact Registry
+GCR_LOCATION = "europe-west1"
 GCR_REPOSITORY = "germina-user-interface"  # Your Artifact Registry repository name
 GCR_REPO_PATH = f"{GCR_LOCATION}-docker.pkg.dev/{GCP_PROJECT}/{GCR_REPOSITORY}"
 
@@ -152,10 +150,10 @@ def build_image(
     # check if user can build
     total_users_images = get_user_images(user.id)
     print('User has already', total_users_images)
-    if len(total_users_images) >= 2:
+    if len(total_users_images) >= 5:
         raise HTTPException(
             status_code=429,
-            detail="Vous avez atteint la limite de 2 interfaces, supprimez-en une pour en créer une nouvelle.",
+            detail="Vous avez atteint la limite de 5 interfaces, supprimez-en une pour en créer une nouvelle.",
         )
     context_object = prepare_build_context(questionnaire_id, user.id)
 
@@ -222,49 +220,55 @@ def delete_image(
     questionnaire_id: str = Query(...),
     user=Depends(get_current_user),
 ):
-    image_prefix = f"user_{user.id}_q_{questionnaire_id}"
-    parent = (
-        f"projects/{GCP_PROJECT}/locations/{GCR_LOCATION}/repositories/{GCR_REPOSITORY}"
+    """
+    Supprime toutes les versions (manifests) d'un package Artifact Registry,
+    en supprimant d'abord tous les tags Docker associés.
+    """
+    package_name = f"user_{user.id}_q_{questionnaire_id}"
+    full_package_path = (
+        f"projects/{GCP_PROJECT}/"
+        f"locations/{GCR_LOCATION}/"
+        f"repositories/{GCR_REPOSITORY}/"
+        f"packages/{package_name}"
     )
+
     client = ar.ArtifactRegistryClient()
-    # Lister les images
-    to_delete = []
+
     try:
-        request = ar.ListDockerImagesRequest(parent=parent)
-        page_result = client.list_docker_images(request=request)
-        for image in page_result:
-            image_name = image.uri.split("/")[-1].split(":")[0]
-            if image_name.startswith(image_prefix):
-                print(f"Image trouvée : {image.uri}")
-                to_delete.append(image.uri)
-
-        print(f"Images trouvées : {len(to_delete)}")
-        # Filtre les images correspondant au préfixe
-        images_to_delete = [name for name in to_delete if image_prefix in name]
-        print(f"Images à supprimer : {images_to_delete}")
-        # Supprime chaque image trouvée
-        for image in images_to_delete:
-            delete_command = [
-                "gcloud",
-                "artifacts",
-                "docker",
-                "images",
-                "delete",
-                f"{image}",
-                "--delete-tags",
-                "--quiet",
-            ]
-            subprocess.run(delete_command, check=True)
-
-        return {"status": "success", "deleted_images": images_to_delete}
-
-    except subprocess.CalledProcessError as e:
+        client.get_package(name=full_package_path)
+    except ar.exceptions.NotFound:
+        logger.error(f"Aucun package trouvé : {full_package_path}")
+        return {"status": "no_images_found", "package": package_name}
+    except ar.exceptions.PermissionDenied as e:
+        logger.error(f"PermissionDenied get_package({full_package_path}) : {e}")
         raise HTTPException(
-            status_code=500,
-            detail=f"Erreur lors de la suppression des images : {e.stderr}",
+            status_code=403, detail="Permission refusée pour get_package"
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur interne : {str(e)}")
+        logger.error(
+            f"Erreur inattendue get_package({full_package_path}) : {type(e).__name__} {e}"
+        )
+        raise HTTPException(
+            status_code=500, detail="Erreur interne lors de la vérification du package"
+        )
+
+    try:
+        op = client.delete_package(name=full_package_path)
+        op.result()  # on attend la fin de l'opération
+        logger.info(f"✅ Package supprimé entièrement : {full_package_path}")
+        return {"status": "success", "deleted_package": package_name}
+    except ar.exceptions.PermissionDenied as e:
+        logger.error(f"PermissionDenied delete_package({full_package_path}) : {e}")
+        raise HTTPException(
+            status_code=403, detail="Permission refusée pour delete_package"
+        )
+    except Exception as e:
+        logger.error(
+            f"Erreur delete_package({full_package_path}) : {type(e).__name__} {e}"
+        )
+        raise HTTPException(
+            status_code=500, detail="Erreur interne lors de la suppression du package"
+        )
 
 
 @app.post("/generate_deploy_script")
@@ -326,7 +330,7 @@ def launch_build(qid: str, payload: BuildPayload, user_id: str, context_object: 
     """Lance le build via Google Cloud Build"""
     # Configuration du client Cloud Build
     client_options = ClientOptions(
-        api_endpoint=f"{CLOUD_BUILD_REGION}-cloudbuild.googleapis.com"
+        api_endpoint=f"{GCR_LOCATION}-cloudbuild.googleapis.com"
     )
     cloudbuild_client = cloudbuild_v1.CloudBuildClient(client_options=client_options)
 
