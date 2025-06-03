@@ -90,9 +90,17 @@ export default function DeploiementPage({ params }: DeploiementProps) {
       const resp = await fetch(
         `${builderApiUrl}/build/${id}`,
         {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ user_id: user!.id, title, schema: schemaJson, ui_schema: uiSchemaJson })
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            user_id: user!.id,
+            title,
+            schema: schemaJson,
+            ui_schema: uiSchemaJson,
+          }),
         }
       );
       if (!resp.ok) {
@@ -102,10 +110,22 @@ export default function DeploiementPage({ params }: DeploiementProps) {
 
       const start = Date.now();
       const poll = async () => {
-        const token = await getToken();
-        await fetchCurrentImage(token);
-        if (currentImage) {
-          setSuccess(`Image créée : ${currentImage.name}`);
+        let latest: ImageInfo | null = null;
+        try {
+          const tokenPoll = await getToken();
+          const res = await fetch(
+            `${builderApiUrl}/list?questionnaire_id=${id}`,
+            { headers: { Authorization: `Bearer ${tokenPoll}` } }
+          );
+          const { images: imgs } = await res.json();
+          latest = imgs.find((img: ImageInfo) => img.tag === "latest") || null;
+        } catch {
+          // Ignorer les erreurs temporaires de fetch
+        }
+  
+        if (latest) {
+          setCurrentImage(latest);
+          setSuccess(`Image créée : ${latest.name}`);
           setSubmitting(false);
           return;
         }
@@ -177,19 +197,31 @@ export default function DeploiementPage({ params }: DeploiementProps) {
       {success && <div className="fixed top-4 right-4 bg-green-100 border border-green-400 text-green-800 px-4 py-3 rounded shadow-lg flex items-center"><span className="flex-1">{success}</span><button onClick={() => setSuccess('')} className="ml-4"><X size={16}/></button></div>}
 
       <div className="flex gap-4 mb-6">
-        <button onClick={handleBuild} disabled={submitting} className={`flex-1 ${currentImage ? 'bg-orange-600 hover:bg-orange-700' : 'bg-blue-600 hover:bg-blue-700'} text-white py-2 rounded disabled:opacity-50 transition-colors`}>
-          {submitting ? 'En cours…' : currentImage ? '🔄 Re-créer l’interface' : '🚀 Créer l’interface'}
-        </button>
-        {currentImage && (
-          <button onClick={handleDelete} disabled={submitting} className="bg-red-600 hover:bg-red-700 text-white py-2 rounded disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
-            <Trash size={16}/>Supprimer
+        {!currentImage && (
+          <button
+            onClick={handleBuild}
+            disabled={submitting}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded disabled:opacity-50 transition-colors"
+          >
+            {submitting ? 'En cours…' : '🚀 Créer l’interface'}
           </button>
         )}
       </div>
 
       {currentImage && (
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-          <h2 className="text-lg font-semibold mb-4">Version actuelle</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-semibold">Version actuelle</h2>
+
+          <button
+              onClick={handleDelete}
+              disabled={submitting}
+              className="bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded disabled:opacity-50 transition-colors flex items-center gap-2"
+            >
+              <Trash size={16} />Supprimer
+          </button>
+        </div>
+
           <div className="border p-4 rounded-md bg-gray-50 dark:bg-gray-700">
             <div className="font-medium text-blue-600 dark:text-blue-300">{currentImage.name.split(':')[0]}</div>
             <div className="text-sm text-gray-600 dark:text-gray-400 mt-1"><span className="font-semibold">Tag :</span> {currentImage.tag}</div>

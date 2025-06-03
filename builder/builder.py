@@ -374,28 +374,26 @@ def launch_build(qid: str, payload: BuildPayload, user_id: str, context_object: 
     )
 
     try:
-        print(f"prépa fini pour {image_tag}...")
         logger.info(f"Lancement du build pour {image_tag}...")
         operation = cloudbuild_client.create_build(
             project_id=GCP_PROJECT, build=build_config
         )
-        print("Build lancé, en attente du résultat...")
         result = operation.result()
-        print("Build terminé, traitement du résultat...")
         logger.info(f"Build terminé : {result.status}")
-        print(result.status_detail)
 
         if result.status == cloudbuild_v1.Build.Status.SUCCESS:
             logger.info(f"Build réussi : {image_tag}")
             supabase.table("questionnaires").update(
                 {"docker_status": "built", "docker_image": image_tag}
             ).eq("id", qid).eq("user_id", user_id).execute()
+            return {"status": "success", "image": image_tag}
         else:
             error_msg = f"Build failed: {result.status_detail}"
             logger.error(error_msg)
             supabase.table("questionnaires").update({"docker_status": "failed"}).eq(
                 "id", qid
             ).eq("user_id", user_id).execute()
+            return {"status": "failed", "error": error_msg}
 
     except Exception as e:
         print("Exception inattendue durant launch_build", e)
