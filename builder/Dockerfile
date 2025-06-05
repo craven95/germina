@@ -11,9 +11,12 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY builder.py /app/
+COPY supabase.py /app/
+COPY cloud.py /app/
+COPY main.py /app/
+
 COPY survey_template /app/survey_template
 
 EXPOSE 8080
 
-CMD ["uvicorn", "builder:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]

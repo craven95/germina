@@ -27,10 +27,6 @@ By bringing together form creation, database management, deployment tooling, and
 ## Installation
 For users : No installation needed. Create an account on the website !
 
-For dev team : you can run interface and api locally just fill :
-
-
-
 ## Support
 cravendiot@gmail.com
 
