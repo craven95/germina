@@ -23,18 +23,18 @@ Décrivez la ou les étapes pour vérifier que tout fonctionne correctement :
 
 2.  Installer les dépendances et lancer l’application :
 
-    # Backend
-    cd builder
-    python3 -m venv .venv && source .venv/bin/activate
-    pip install -r requirements.txt
-    uvicorn main:app --reload
+    - Backend
+        cd builder
+        python3 -m venv .venv && source .venv/bin/activate
+        pip install -r requirements.txt
+        uvicorn main:app --reload
 
-    # Frontend
-    cd interface
-    npm ci
-    npm run dev
+    - Frontend
+        cd interface
+        npm ci
+        npm run dev
 
-3.  Reproduire le scénario lié à votre modification (page à charger, endpoint à appeler, etc.).
+## Reproduire le scénario lié à votre modification (page à charger, endpoint à appeler, etc.).
 
 Checklist avant PR
 
@@ -46,6 +46,6 @@ J’ai mis à jour la documentation (README, exemples, etc.) si nécessaire.
 
 Je n’ai pas laissé de données sensibles ou de clés d’API dans les commits.
 
-    Mon commit contient un message clair et descriptif.
+Mon commit contient un message clair et descriptif.
 
-Merci pour votre contribution ! Un·e mainteneur·se passera en revue votre PR dès que possible. 😊
+## Merci pour votre contribution ! Un·e mainteneur·se passera en revue votre PR dès que possible. 😊

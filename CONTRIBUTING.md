@@ -22,45 +22,41 @@ Merci de votre intérêt pour contribuer à **Germina** ! 😊 Votre aide est la
 ## 2. Bonnes pratiques Git
 
 1. **Fork & Clone**  
-   # Forkez le dépôt sur GitHub via l’interface.
-   git clone https://github.com/votre-utilisateur/germina.git
-   cd germina
+Forkez le dépôt sur GitHub via l’interface.
+    git clone https://github.com/votre-utilisateur/germina.git
+    cd germina
 
 
 2. **Créer un remote pour le dépôt officiel**
-
-git remote add upstream https://github.com/original-owner/germina.git
-git fetch upstream
+Copy :
+    git remote add upstream https://github.com/original-owner/germina.git
+    git fetch upstream
 
 3. **Travailler sur une branche dédiée**
 
     Ne travaillez jamais directement sur main.
 
     Créez une branche descriptive pour votre fonctionnalité ou correction de bug :
-
-    git checkout -b feature/ajout-nouvelle-question
-    # ou
-    git checkout -b bugfix/correction-validation-schema
+        git checkout -b feature/ajout-nouvelle-question
+        ou
+        git checkout -b bugfix/correction-validation-schema
 
 4. **Commits atomiques et messages clairs**
 
-    Un commit = une seule idée (petite fonctionnalité, correction d’un bug, amélioration d’une doc).
+Un commit = une seule idée (petite fonctionnalité, correction d’un bug, amélioration d’une doc).
 
-    Format recommandé pour le message de commit :
+Format recommandé pour le message de commit :
 
-    type(scope): description courte
+type(scope): description courte
 
-    Description plus détaillée si nécessaire.
+Description plus détaillée si nécessaire.
 
-    type ∈ {feat, fix, docs, style, refactor, test, chore}
+type ∈ {feat, fix, docs, style, refactor, test, chore}
 
-    scope (facultatif) indique la partie du projet par ex. (frontend), (backend), (ci).
+scope (facultatif) indique la partie du projet par ex. (frontend), (backend), (ci).
 
-    Exemple :
-
-        feat(frontend): ajouter le champ "age" dans le schéma de questionnaire
-
-        Le ChatAssistant prend maintenant en charge l’ajout automatique d’une question "Quel est votre âge ?" de type "number".
+Exemple :
+feat(frontend): enable user interface versionning
 
 5. **Mettre à jour depuis upstream/main régulièrement**
 
@@ -88,94 +84,83 @@ Pour l'installation vous pouvez suivre :
 
 ## 4. Processus de Pull Request
 
-Créez une Pull Request (PR) vers la branche main du dépôt officiel
+1. Créez une Pull Request (PR) vers la branche main du dépôt officiel
+- Votre branche doit être à jour (git rebase main ou git merge main).
+- Ne forcez jamais git push --force sur la branche main.
 
-    Votre branche doit être à jour (git rebase main ou git merge main).
+2. Titre et description de la PR
 
-    Ne forcez jamais git push --force sur la branche main.
+- Choisissez un titre explicite, par ex. feat: add statistics for local deployements.
 
-Titre et description de la PR
+- Dans la description, détaillez :
+Quel problème vous résolvez ou quelle fonctionnalité vous ajoutez.
+Comment tester/localiser les changements.
+Screenshots ou extraits de code si pertinente.
 
-    Choisissez un titre explicite, par ex. feat: add statistics for local deployements.
+3. Vérifications avant la PR
+- Lint sans erreur :
+Backend : flake8 . ou black --check .
+Frontend : npm run lint
 
-    Dans la description, détaillez :
+- Tests : assurez-vous que toute la suite (backend + frontend) passe.
 
-        Quel problème vous résolvez ou quelle fonctionnalité vous ajoutez.
+- Documentez : si vous ajoutez une nouvelle fonctionnalité, mettez à jour les README appropriés (backend ou interface).
 
-        Comment tester/localiser les changements.
+4. Révisions & feedback
+Les mainteneurs pourront commenter votre PR et demander des modifications si besoin.
 
-        Screenshots ou extraits de code si pertinente.
-
-Vérifications avant la PR
-
-    Lint sans erreur :
-
-        Backend : flake8 . ou black --check .
-
-        Frontend : npm run lint
-
-    Tests : assurez-vous que toute la suite (backend + frontend) passe.
-
-    Documentez : si vous ajoutez une nouvelle fonctionnalité, mettez à jour les README appropriés (backend ou interface).
-
-Révisions & feedback
-
-    Les mainteneurs pourront commenter votre PR et demander des modifications si besoin.
-
-Merge
-
-    Une fois validée, votre PR sera fusionnée par un mainteneur.
-
-    Le déploiement CI/CD s’exécutera automatiquement (tests, build, déploiement).
+5. Merge
+Une fois validée, votre PR sera fusionnée par un mainteneur.
+Le déploiement CI/CD s’exécutera automatiquement (tests, build, déploiement).
 
 ---
 
 ## 5. Style guide & bonnes pratiques
-5.1 Code Python (Backend)
 
-    Respectez PEP 8 (utilisez flake8, black, isort).
+1. Code Python (Backend)
 
-    Annotations de type (mypy compatible si possible).
+Respectez PEP 8 (utilisez flake8, black, isort).
 
-    Docstrings pour les fonctions publiques (ex. endpoint FastAPI).
+Annotations de type (mypy compatible si possible).
 
-5.2 Code TypeScript / React (Frontend)
+Docstrings pour les fonctions publiques (ex. endpoint FastAPI).
 
-    Pas de any si possible (privilégiez un typage strict).
+2. Code TypeScript / React (Frontend)
 
-    Composants fonctionnels avec hooks React.
+Pas de any si possible (privilégiez un typage strict).
 
-5.3 Commit Messages
+Composants fonctionnels avec hooks React.
 
-    Courts, descriptifs, en anglais pour etre cohérent avec l’ensemble du project :D
+3. Commit Messages
 
-    Format recommandé :
+Courts, descriptifs, en anglais pour etre cohérent avec l’ensemble du project :D
 
-    <type>(<scope>): <courte description>
+Format recommandé :
 
-    avec type ∈ {feat, fix, docs, style, refactor, test, chore}
+<type>(<scope>): <courte description>
 
-    Exemples :
+avec type ∈ {feat, fix, docs, style, refactor, test, chore}
 
-        fix(backend): good path for docker envs
+Exemples :
+fix(backend): good path for docker envs
 
-        feat(frontend): add new delete icon
+feat(frontend): add new delete icon
 
 ---
 
 ## 6. Reporting de bugs & suggestions d’amélioration
 
-    Ouvrir une issue
+Ouvrir une issue
 
-        Utilisez le template “Bug report” ou “Feature request” dans GitHub.
+Utilisez le template “Bug report” ou “Feature request” dans GitHub.
 
-        Décrivez le plus précisément possible (étapes pour reproduire, captures d’écran, logs d’erreur).
+Décrivez le plus précisément possible (étapes pour reproduire, captures d’écran, logs d’erreur).
 
-    Participer aux discussions
+Participer aux discussions
 
-        Donnez votre avis sur les issues existantes.
+Donnez votre avis sur les issues existantes.
 
-        Proposez des idées, votez pour les fonctionnalités prioritaires !
+Proposez des idées, votez pour les fonctionnalités prioritaires !
 
 ---
 
