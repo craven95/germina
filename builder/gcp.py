@@ -42,7 +42,6 @@ def get_user_images(image_prefix: str) -> list:
         for image in page_result:
             image_name = image.uri.split("/")[-1].split(":")[0]
             if image_name.startswith(image_prefix):
-                print(f"Image trouvée : {image.uri}")
                 images.append(image)
     except Exception as e:
         logger.error(f"Erreur Artifact Registry: {str(e)}")
@@ -119,7 +118,6 @@ def prepare_build_context(qid: str, user_id: str) -> str:
         base = Path(__file__).parent / "survey_template"
         build_dir = Path(tmp_dir) / "custom_build_context"
         shutil.copytree(base, build_dir, dirs_exist_ok=True)
-        print(list(build_dir.iterdir()))
         archive_name = f"context_{qid}_{user_id}.tar.gz"
         archive_path = Path(tmp_dir) / archive_name
         with tarfile.open(archive_path, "w:gz") as tar:
@@ -206,8 +204,7 @@ def launch_build(user_id: str, qid: str, payload) -> dict:
             logger.error(error_msg)
             return {"status": "failed", "error": error_msg}
 
-    except Exception as e:
-        print("Exception inattendue durant launch_build", e)
+    except Exception:
         logger.exception("Exception inattendue durant launch_build")
         raise HTTPException(status_code=500, detail="Erreur lors du lancement du build")
 

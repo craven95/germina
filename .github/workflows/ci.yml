@@ -1,0 +1,45 @@
+name: CI
+
+on: [pull_request]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: |
+          cd builder
+          python3 -m venv .venv
+          source .venv/bin/activate
+          pip install -r requirements.txt
+      - name: Lint & Format (backend)
+        run: |
+          cd builder
+          flake8 .
+      - name: Run FastAPI tests
+        run: |
+          cd builder
+          pytest
+
+  frontend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - name: Install & Lint (frontend)
+        run: |
+          cd interface
+          npm ci
+          npm run lint
+      - name: Run React tests
+        run: |
+          cd interface
+          npm test
