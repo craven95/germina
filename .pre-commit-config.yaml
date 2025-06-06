@@ -3,21 +3,33 @@ repos:
     rev: 23.3.0
     hooks:
       - id: black
+        language_version: python3.10
+
   - repo: https://github.com/PyCQA/isort
     rev: 5.12.0
     hooks:
       - id: isort
-  
+        name: isort (python)
+        language_version: python3.10
 
-  # TODO: add flake8 and mypy later  
+  - repo: https://github.com/PyCQA/flake8
+    rev: 6.1.0
+    hooks:
+      - id: flake8
+        additional_dependencies: []
+        args: ["--config=pyproject.toml"]
 
-  # - repo: https://github.com/PyCQA/flake8
-  #   rev: 6.1.0
-  #   hooks:
-  #     - id: flake8
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.6.1
+    hooks:
+      - id: mypy
+        name: mypy typing check
+        args: ["--config-file=pyproject.toml", "--ignore-missing-imports"]
+        language_version: python3.10
 
-
-  # - repo: https://github.com/pre-commit/mirrors-mypy
-  #   rev: v1.6.1
-  #   hooks:
-  #     - id: mypy
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-yaml

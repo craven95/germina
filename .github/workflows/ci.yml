@@ -1,45 +1,73 @@
 name: CI
 
-on: [pull_request]
+on:
+  pull_request:
+    branches: [main]
 
 jobs:
-  backend-tests:
+  lint-and-test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10"]
     steps:
       - uses: actions/checkout@v3
+
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: ${{ matrix.python-version }}
+
       - name: Install dependencies
         run: |
           cd builder
           python3 -m venv .venv
           source .venv/bin/activate
+          pip install --upgrade pip
           pip install -r requirements.txt
-      - name: Lint & Format (backend)
+          cd ..
+
+      - name: Run Black check
+        run: |
+          cd builder
+          black --check .
+
+      - name: Run isort check
+        run: |
+          cd builder
+          isort --check-only --profile black .
+
+      - name: Run Flake8
         run: |
           cd builder
           flake8 .
-      - name: Run FastAPI tests
+
+      - name: Run mypy
         run: |
           cd builder
-          pytest
+          mypy .
 
-  frontend-tests:
+  frontend-lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Setup Node
+
+      - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
-      - name: Install & Lint (frontend)
+          node-version: "18"
+
+      - name: Install dependencies
         run: |
           cd interface
           npm ci
-          npm run lint
-      - name: Run React tests
+
+      - name: Run ESLint (si vous avez ESLint dans interface/)
         run: |
           cd interface
-          npm test
+          npm run lint
+
+      - name: Run Prettier check
+        run: |
+          cd interface
+          npm run format:check  # ou une commande équivalente

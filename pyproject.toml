@@ -16,6 +16,14 @@ ignore_missing_imports = true
 [tool.flake8]
 max-line-length = 88
 extend-ignore = ['E203', 'W503']
+exclude = [
+  ".venv",
+  "__pycache__",
+  "survey_template/static",
+  "survey_template/templates",
+  "node_modules",
+  "interface",
+]
 
 [build-system]
 requires = ['setuptools', 'wheel']
