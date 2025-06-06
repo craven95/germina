@@ -8,9 +8,11 @@ export async function POST(req: Request) {
     apiKey: process.env.MISTRAL_API_KEY ?? '',
   });
 
+  const agentId = process.env.MISTRAL_AGENT_ID;
+
   try {
     const result = await client.agents.complete({
-      agentId: 'ag:f57c2f23:20250514:surveycreator:d1f0820f',
+      agentId: agentId || 'mistral-agent',
       messages: [
         {
           role: 'system',

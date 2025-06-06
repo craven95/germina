@@ -11,8 +11,8 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY supabase.py /app/
-COPY cloud.py /app/
+COPY users.py /app/
+COPY gcp.py /app/
 COPY main.py /app/
 
 COPY survey_template /app/survey_template

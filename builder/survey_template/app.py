@@ -37,46 +37,16 @@ with open('ui_schema.json') as f:
     UI_SCHEMA = json.load(f)
 
 
-def get_file_fields(schema):
-    """Identifie les champs de fichier dans le schéma"""
-    return [
-        key
-        for key, prop in schema['properties'].items()
-        if prop.get('format') == 'data-url'
-    ]
-
-
-def generate_anonymous_code():
-    """Génère un code anonyme unique"""
-    return str(uuid.uuid4())[:8]
-
-
-def save_uploaded_files(field_name, files, code):
-    """Sauvegarde les fichiers selon la structure spécifiée"""
-    field_dir = BASE_STORAGE / field_name / code
-    field_dir.mkdir(parents=True, exist_ok=True)
-
-    saved_files = []
-    for idx, file in enumerate(files):
-        if file.filename == '':
-            continue
-
-        ext = Path(file.filename).suffix.lower()
-        if ext[1:] not in ALLOWED_EXTENSIONS:
-            continue
-
-        filename = f"{field_name}_{code}_{idx + 1}{ext}"
-        filepath = field_dir / filename
-        file.save(filepath)
-        saved_files.append(str(filepath.relative_to(BASE_STORAGE)))
-
-    return saved_files
-
-
 def parse_form_data(form_data: MultiDict, json_schema: dict) -> dict:
     """
     Parse les données d'un formulaire (MultiDict) selon un schéma JSON.
     Retourne un dict prêt à être inséré dans un Excel.
+
+    Args:
+        form_data (MultiDict): Les données du formulaire à parser.
+        json_schema (dict): Le schéma JSON décrivant la structure des données.
+    Returns:
+        dict: Un dictionnaire avec les données du formulaire converties selon le schéma.
     """
     parsed = OrderedDict()
 
@@ -116,6 +86,57 @@ def parse_form_data(form_data: MultiDict, json_schema: dict) -> dict:
     return parsed
 
 
+def generate_anonymous_code():
+    """Génère un code anonyme unique pour chaque entrée du questionnaire"""
+    return str(uuid.uuid4())[:8]
+
+
+def get_file_fields(schema):
+    """Identifie les champs de fichier dans le schéma pour les traiter correctement.
+    Args:
+        schema (dict): Le schéma JSON du questionnaire.
+    Returns:
+        list: Liste des noms de champs qui sont des fichiers (data-url).
+    """
+    return [
+        key
+        for key, prop in schema['properties'].items()
+        if prop.get('format') == 'data-url'
+    ]
+
+
+def save_uploaded_files(field_name, files, entry_id):
+    """Sauvegarde les fichiers en local sur la machine du serveur.
+    Crée un répertoire pour chaque champ de fichier et enregistre les fichiers avec un nom unique.
+
+    Args:
+        field_name (str): Le nom du champ de fichier.
+        files (list): Liste des fichiers uploadés.
+        entry_id (str): L'ID de l'entrée du questionnaire.
+    Returns:
+        list: Liste des chemins relatifs des fichiers sauvegardés pour ajouter dans l'Excel.
+    """
+    field_dir = BASE_STORAGE / field_name / entry_id
+    field_dir.mkdir(parents=True, exist_ok=True)
+
+    saved_files = []
+    for idx, file in enumerate(files):
+        if file.filename == '':
+            continue
+
+        ext = Path(file.filename).suffix.lower()
+        if ext[1:] not in ALLOWED_EXTENSIONS:
+            continue
+
+        filename = f"{field_name}_{entry_id}_{idx + 1}{ext}"
+        filepath = field_dir / filename
+        file.save(filepath)
+        saved_files.append(str(filepath.relative_to(BASE_STORAGE)))
+
+    return saved_files
+
+
+## Flask routes
 @app.route('/')
 def form():
     return render_template(

@@ -1,57 +1,38 @@
-# Name
-Germina
+# Germina
 
 ## Description
-This project is designed to lower the barrier for individuals—such as graduate students, independent researchers, or anyone needing to conduct a survey—to create questionnaires, manage the underlying database, deploy their application to the Internet, and perform data analysis. By bundling form‐builder interfaces with an intuitive database schema and one–click deployment scripts, users no longer need extensive technical expertise to collect, store, and analyze responses.
 
-Key features include:
+Germina est une plateforme tout‐en‐un permettant de créer, déployer et analyser des questionnaires.  
+- **Frontend** : React / Next.js (déployé sur Vercel)  
+- **Backend “builder”** : FastAPI (déployé sur Google Cloud Run), génère des images Docker via Cloud Build & Artifact Registry.  
+- **Base de données & Auth** : Supabase.
 
-    Questionnaire Builder
-    A drag‐and‐drop or code‐guided interface allows you to design any kind of survey: multiple choice, free‐text, numeric inputs, date pickers, and more. You can customize question order, group fields into sections, and preview the form on desktop or mobile.
+## Organisation des dossiers
 
-    Database Integration
-    Every submission is automatically stored in a structured database (PostgreSQL by default), with built‐in support for schema migrations. Users can review raw data in a user‐friendly admin panel, export CSV or JSON, or connect BI tools directly to the database.
+- `/interface/` → l’interface Next.js  
+- `/builder/`   → le service FastAPI pour builder / lister / supprimer des images Docker  
+- `.github/workflows/` → CI/CD pour déployer sur Vercel et Cloud Run
 
-    Flexible Deployment Options
-    Whether you want to run everything on your own laptop or spin up a cloud‐hosted instance, this project provides deployment scripts for both Docker–based local hosting and managed cloud platforms (AWS, Azure, Google Cloud). This ensures you retain full control over where your data lives, plus a straightforward way to scale if your survey gains traction.
+## Liens rapides
 
-    End‐to‐End Data Control
-    Since users can choose local hosting, private‐cloud installations, or a public cloud provider, you own every byte of your survey data. Encryption (at rest and in transit), role‐based access control, and automated backups are all part of the standard setup. No vendor lock‐in means your data remains portable and under your governance.
+- **Interface (Next.js)**  
+  - [README détaillé](interface/README.md)
 
-    Built‐In Analytics and Reporting
-    A lightweight analytics dashboard lets you visualize response distributions, compute summary statistics, and apply simple filters (date ranges, demographics, etc.) directly in the web interface. For more advanced analysis, raw data can be exported or queried through a built‐in API.
+- **API Builder (FastAPI)**  
+  - [README détaillé](builder/README.md)
 
-By bringing together form creation, database management, deployment tooling, and analytics into a single, user‐friendly package, this project empowers thesis authors and other non‐technical users to run professional‐quality surveys without needing to assemble multiple third‐party services. Users can start locally—testing their survey on a laptop—and later transition to a cloud environment to handle larger respondent pools, all while maintaining full transparency and ownership of their data from end to end.
+## Démo en ligne
 
-
-## Installation
-For users : No installation needed. Create an account on the website !
+- **Interface (Next.js)** :  
+  https://germina-cravens-projects-8d4cfd75.vercel.app
 
 ## Support
-cravendiot@gmail.com
 
-## Authors and acknowledgment
-Craven
+Pour toute question ou problème, contactez :  
+germina.general@gmail.com
 
-## License
-MIT License
+## Licence
 
-Copyright (c) 2025 Germina
+Ce projet est sous licence **MIT**. Voir le fichier [LICENSE](LICENSE) pour le texte complet.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell  
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:  
-
-The above copyright notice and this permission notice shall be included in all  
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR  
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE  
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER  
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,  
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE  
-SOFTWARE.
+---
