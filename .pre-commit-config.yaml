@@ -33,3 +33,19 @@ repos:
       - id: end-of-file-fixer
       - id: trailing-whitespace
       - id: check-yaml
+
+  - repo: https://github.com/pre-commit/mirrors-eslint
+    rev: v9.28.0
+    hooks:
+      - id: eslint
+        name: eslint (interface)
+        entry: eslint
+        language: node
+        files: ^interface/.*\.(js|jsx|ts|tsx)$
+        args:
+          - --config
+          - interface/eslint.config.cjs
+          - --fix
+          - --ext
+          - .js,.jsx,.ts,.tsx
+          - interface

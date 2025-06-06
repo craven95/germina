@@ -65,7 +65,7 @@ jobs:
       - name: Run ESLint (si vous avez ESLint dans interface/)
         run: |
           cd interface
-          npm run lint
+          npx eslint . --ext .js,.jsx,.ts,.tsx --config .eslintrc.json
 
       - name: Run Prettier check
         run: |
