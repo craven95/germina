@@ -32,10 +32,10 @@ export async function POST(req: Request) {
     const cleaned = (typeof raw === 'string' ? raw : JSON.stringify(raw))
     .replace(/```json|```/g, '')
     .trim();
-    
+
     console.log('Réponse brute nettoyée:', cleaned);
 
-    
+
     let parsed;
     try {
       parsed = JSON.parse(cleaned);

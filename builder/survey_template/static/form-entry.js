@@ -9,10 +9,10 @@ const FormWithTheme = withTheme(Bootstrap4Theme);
 const handleSubmit = async ({ formData: fd }) => {
     const body = new FormData();
     Object.entries(fd).forEach(([k, v]) => body.append(k, v));
-  
+
     const r = await fetch('/submit', { method: 'POST', body });
     const json = await r.json();
-  
+
     if (r.ok && json.status === 'ok') {
       alert(`✅ Succès : entrée ${json.entry_id} enregistrée.`);
       window.location.reload();

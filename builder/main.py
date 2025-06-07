@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,14 +25,14 @@ app.add_middleware(
 )
 
 
-class BuildPayload(BaseModel):
+class BuildPayload(BaseModel):  # type: ignore[misc]
     user_id: str
     title: str
-    schema: dict
-    ui_schema: dict
+    schema: Dict[str, Any]
+    ui_schema: Dict[str, Any]
 
 
-class DeployScriptPayload(BaseModel):
+class DeployScriptPayload(BaseModel):  # type: ignore[misc]
     image: str
     port: Optional[int] = 5000
     volume_path: Optional[str] = "~/docker_data"
@@ -40,13 +40,13 @@ class DeployScriptPayload(BaseModel):
     qid: Optional[str] = "unknown"
 
 
-@app.post("/build/{questionnaire_id}", status_code=202)
+@app.post("/build/{questionnaire_id}", status_code=202)  # type: ignore[misc]
 def build_image(
     questionnaire_id: str,
     payload: BuildPayload,
     bg: BackgroundTasks,
-    user=Depends(get_current_user),
-):
+    user: Any = Depends(get_current_user),
+) -> Dict[str, Any]:
     """
     Lance le build d'une image Docker pour le questionnaire donné.
 
@@ -66,24 +66,31 @@ def build_image(
     if len(total_users_images) >= 5:
         raise HTTPException(
             status_code=429,
-            detail="Vous avez atteint la limite de 5 interfaces, supprimez-en une pour en créer une nouvelle.",
+            detail=(
+                "Vous avez atteint la limite de 5 interfaces, "
+                "supprimez-en une pour en créer une nouvelle."
+            ),
         )
 
     bg.add_task(launch_build, user.id, questionnaire_id, payload)
     return {"status": "pending", "questionnaire_id": questionnaire_id}
 
 
-@app.get("/build_status")
-def build_status(questionnaire_id: str, user=Depends(get_current_user)):
+@app.get("/build_status")  # type: ignore[misc]
+def build_status(
+    questionnaire_id: str,
+    user: Any = Depends(get_current_user),
+) -> Dict[str, Any]:
     """
     Vérifie le statut des builds pour un questionnaire donné.
+
     Args:
         questionnaire_id (str): L'ID du questionnaire pour lequel vérifier le statut.
         user: L'utilisateur actuel, récupéré via Supabase.
+
     Returns:
         dict: Un dictionnaire contenant le statut des builds et les images associées.
-    Raises:
-        HTTPException: Si aucune image n'est trouvée pour le questionnaire.
+
     """
     image_prefix = f"user_{user.id}_q_{questionnaire_id}"
 
@@ -97,81 +104,91 @@ def build_status(questionnaire_id: str, user=Depends(get_current_user)):
     else:
         return {
             "status": "success",
-            "message": f"{len(images)} builds trouvés pour le questionnaire {questionnaire_id}.",
+            "message": (f"{len(images)} builds trouvés pour le questionnaire {questionnaire_id}."),
             "images": [
                 {
-                    "name": image.uri.split("/")[-1].split("@")[0],
-                    "tags": image.tags,
-                    "updated_at": image.upload_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "name": img.uri.split("/")[-1].split("@")[0],
+                    "tags": img.tags,
+                    "updated_at": img.upload_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 }
-                for image in images
+                for img in images
             ],
         }
 
 
-@app.get("/list")
-def list_images(questionnaire_id: str, user=Depends(get_current_user)):
-    """Liste les images dans Artifact Registry pour le questionnaire donné.
+@app.get("/list")  # type: ignore[misc]
+def list_images(
+    questionnaire_id: str,
+    user: Any = Depends(get_current_user),
+) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Liste les images dans Artifact Registry pour le questionnaire donné.
+
     Args:
         questionnaire_id (str): L'ID du questionnaire pour lequel lister les images.
         user: L'utilisateur actuel, récupéré via Supabase.
+
     Returns:
         dict: Un dictionnaire contenant les images et leurs tags.
-    Raises:
-        HTTPException: Si aucune image n'est trouvée pour le questionnaire.
     """
     image_prefix = f"user_{user.id}_q_{questionnaire_id}"
 
     images = get_user_images(image_prefix)
-
-    to_return_images = [
-        {
-            "name": f"{image.uri.split('/')[-1].split('@')[0]}",
-            "tag": tag,
-            "updated_at": image.upload_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        }
-        for image in images
-        for tag in image.tags
-    ]
+    to_return_images: List[Dict[str, Any]] = []
+    for image in images:
+        for tag in image.tags:
+            to_return_images.append(
+                {
+                    "name": image.uri.split("/")[-1].split("@")[0],
+                    "tag": tag,
+                    "updated_at": image.upload_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                }
+            )
 
     return {"images": to_return_images}
 
 
-@app.delete("/delete_image", status_code=200)
+@app.delete("/delete_image", status_code=200)  # type: ignore[misc]
 def delete_image(
     questionnaire_id: str,
-    user=Depends(get_current_user),
-):
+    user: Any = Depends(get_current_user),
+) -> Dict[str, str]:
     """
     Supprime un package complet dans Artifact Registry pour un questionnaire donné.
+
     Args:
         questionnaire_id (str): L'ID du questionnaire pour lequel supprimer le package.
         user: L'utilisateur actuel, récupéré via Supabase.
+
     Returns:
         dict: Un dictionnaire contenant le statut de la suppression.
+
     Raises:
-        HTTPException: Si le package n'existe pas ou si une erreur se produit lors de la suppression.
+        HTTPException: Si le package n'existe pas ou en cas d'erreur.
     """
     package_name = f"user_{user.id}_q_{questionnaire_id}"
     try:
         delete_package_from_package_name(package_name)
         return {"status": "success", "message": f"Package {package_name} supprimé."}
     except HTTPException as e:
-        return {
-            "status": "error",
-            "message": str(e.detail),
-        }
+        return {"status": "error", "message": str(e.detail)}
 
 
-@app.post("/generate_deploy_script")
-def get_deploy_script(p: DeployScriptPayload):
-    """Génère le script de déploiement pour l'image Docker spécifiée.
+@app.post("/generate_deploy_script")  # type: ignore[misc]
+def get_deploy_script(
+    p: DeployScriptPayload,
+) -> Response:
+    """
+    Gènère le script de déploiement pour l'image Docker spécifiée.
+
     Args:
-        p (DeployScriptPayload): Les paramètres nécessaires pour générer le script de déploiement.
+        p (DeployScriptPayload): Les paramètres nécessaires pour générer le script.
+
     Returns:
-        Response: Un objet Response contenant le script de déploiement en texte brut.
+        Response: Un objet Response contenant le script en texte brut.
+
     Raises:
-        HTTPException: Si l'image n'est pas spécifiée ou si le script ne peut pas être généré.
+        HTTPException: Si l'image n'est pas spécifiée ou en cas d'erreur.
     """
     script, ext = generate_deploy_script(
         p.image,

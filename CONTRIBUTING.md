@@ -6,22 +6,22 @@ Merci de votre intérêt pour contribuer à **Germina** ! 😊 Votre aide est la
 
 ## 1. Avant de commencer
 
-1. **Lisez la licence**  
+1. **Lisez la licence**
    Ce projet est sous licence [MIT](../LICENSE). En contribuant, vous acceptez les termes de cette licence.
 
-2. **Évitez de committer des données sensibles**  
-   - Ne publiez jamais vos clés API, secrets ou mots de passe.  
-   - Vérifiez que votre code ne contient aucune information confidentielle (ex. `.env`).  
+2. **Évitez de committer des données sensibles**
+   - Ne publiez jamais vos clés API, secrets ou mots de passe.
+   - Vérifiez que votre code ne contient aucune information confidentielle (ex. `.env`).
 
-3. **Choisissez un sujet**  
-   - Parcourez les [Issues](https://github.com/votre-utilisateur/germina/issues) pour voir si quelqu’un a déjà signalé un problème ou suggéré une amélioration.  
+3. **Choisissez un sujet**
+   - Parcourez les [Issues](https://github.com/votre-utilisateur/germina/issues) pour voir si quelqu’un a déjà signalé un problème ou suggéré une amélioration.
    - Si votre idée n’est pas encore documentée, ouvrez d’abord une **issue** pour en discuter avant de commencer à coder.
 
 ---
 
 ## 2. Bonnes pratiques Git
 
-1. **Fork & Clone**  
+1. **Fork & Clone**
 Forkez le dépôt sur GitHub via l’interface.
     git clone https://github.com/votre-utilisateur/germina.git
     cd germina
@@ -72,12 +72,12 @@ Avant de créer une Pull Request, assurez-vous que votre branche est à jour :
 
 ## 3. Installer et configurer le projet en local
 
-Pour l'installation vous pouvez suivre : 
+Pour l'installation vous pouvez suivre :
 
-- **Interface (Next.js)**  
+- **Interface (Next.js)**
   - [README détaillé](interface/README.md)
 
-- **API Builder (FastAPI)**  
+- **API Builder (FastAPI)**
   - [README détaillé](builder/README.md)
 
 ---

@@ -48,7 +48,8 @@ module.exports = [
     languageOptions: {
       parser: require('@typescript-eslint/parser'),
       parserOptions: {
-        project: './tsconfig.json'
+        project: './tsconfig.json',
+        tsconfigRootDir: __dirname,
       }
     },
     plugins: {

@@ -40,9 +40,9 @@ export default function ChatAssistant({
 
   const supabase = createClient();
   const BOT_LIMIT = 100;
-  
+
   const validatePatch = (patches: any): patches is Operation[] => {
-    return Array.isArray(patches) && patches.every(op => 
+    return Array.isArray(patches) && patches.every(op =>
       op && typeof op === 'object' &&
       ['add', 'remove', 'replace', 'move', 'copy', 'test'].includes(op.op) &&
       typeof op.path === 'string'
@@ -56,13 +56,13 @@ const applySafeModifications = useCallback(
         throw new Error('Format de patch invalide');
       }
 
-      const baseStructure = target === 'schema' ? { 
+      const baseStructure = target === 'schema' ? {
         $schema: "http://json-schema.org/draft-07/schema#",
         type: "object",
         properties: {},
         required: []
       } : {};
-      
+
       const current = structuredClone(initialSchema[target] || baseStructure);
 
       if (target === 'schema' && typeof current.properties !== 'object') {
@@ -150,7 +150,7 @@ const applySafeModifications = useCallback(
               content: `
               Current Schema:
               ${JSON.stringify(initialSchema.schema, null, 2)}
-              
+
               Current UI Schema:
               ${JSON.stringify(initialSchema.uiSchema, null, 2)}
               `
@@ -159,11 +159,11 @@ const applySafeModifications = useCallback(
           ]
         })
       });
-      
+
       const data = await response.json();
       console.log('Assistant response:', data);
       console.log('MAINTENANT ON VA PARSER LA REPONSE');
-      const { response: textResponse, modifications } = data.content 
+      const { response: textResponse, modifications } = data.content
       ? JSON.parse(data.content.replace(/```json/g, '').replace(/```/g, '').trim())
       : data;
 
@@ -176,9 +176,9 @@ const applySafeModifications = useCallback(
 
         if (modifications) {
           console.log('Applying modifications:', modifications);
-          
+
           let success = true;
-          
+
           if (modifications.title) {
             onModify({ title: modifications.title });
           }
@@ -240,7 +240,7 @@ const applySafeModifications = useCallback(
             GerminaBot ✨
           </h2>
         </div>
-  
+
         {/* Messages, scrollable */}
         <div className="flex-1 overflow-y-auto space-y-4">
           {messages.map((msg, i) => (
@@ -248,7 +248,7 @@ const applySafeModifications = useCallback(
               msg.role === 'user' ? 'bg-blue-100 ml-6' : 'bg-gray-100 mr-6'
             }`}>
               <strong>
-                {msg.role === 'user' ? 'Vous' : 'GerminaBot'} 
+                {msg.role === 'user' ? 'Vous' : 'GerminaBot'}
                 {msg.role === 'assistant' && <span className="ml-1">✨</span>}
                 :
               </strong>
@@ -256,7 +256,7 @@ const applySafeModifications = useCallback(
             </div>
           ))}
         </div>
-  
+
         {/* Input, fixe en bas */}
         <form onSubmit={handleSubmit} className="mt-2 flex items-center gap-2 shrink-0">
           {/* Wrapper pour permettre au champ de se contracter proprement */}

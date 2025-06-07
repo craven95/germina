@@ -6,13 +6,13 @@ Cette partie contient le backend “builder” (FastAPI) qui gère la création,
 
 ## Table des matières
 
-1. [Vue d’ensemble](#vue-densemble)  
-2. [Prérequis](#prérequis)  
-3. [Installation & exécution en local](#installation--exécution-en-local)  
-4. [Création du docker](#création-du-docker)  
-5. [Structure du dossier](#structure-du-dossier)  
-6. [CI/CD (GitHub Actions → Cloud Run)](#déploiement-automatique-github-actions--gcp-cloud-run)  
-7. [Licence](#licence)  
+1. [Vue d’ensemble](#vue-densemble)
+2. [Prérequis](#prérequis)
+3. [Installation & exécution en local](#installation--exécution-en-local)
+4. [Création du docker](#création-du-docker)
+5. [Structure du dossier](#structure-du-dossier)
+6. [CI/CD (GitHub Actions → Cloud Run)](#déploiement-automatique-github-actions--gcp-cloud-run)
+7. [Licence](#licence)
 
 ---
 
@@ -20,25 +20,25 @@ Cette partie contient le backend “builder” (FastAPI) qui gère la création,
 
 Le dossier **`builder/`** contient un service **FastAPI** qui :
 
-- Vérifie le JWT Supabase pour chaque requête.  
-- Implemente un compteur de quotas (`api_usage`) dans Supabase pour limiter l’usage.  
+- Vérifie le JWT Supabase pour chaque requête.
+- Implemente un compteur de quotas (`api_usage`) dans Supabase pour limiter l’usage.
 - Expose 5 endpoints principaux :
-  1. **`POST /build/{questionnaire_id}`**  
-     - Lance, en tâche de fond, la création d’une image Docker via **Cloud Build**.  
-     - Pousse l’image dans **Artifact Registry** (`germina-backend/builder`).  
-  2. **`GET /build_status?questionnaire_id=<id>`**  
-     - Liste les builds (images Docker) déjà créées pour ce questionnaire.  
-  3. **`GET /list?questionnaire_id=<id>`**  
-     - Renvoie la liste des images (méta : `name`, `tag`, `updated_at`).  
-  4. **`DELETE /delete_image?questionnaire_id=<id>`**  
-     - Supprime un package (toutes versions/tous tags) dans Artifact Registry.  
-  5. **`POST /generate_deploy_script`**  
+  1. **`POST /build/{questionnaire_id}`**
+     - Lance, en tâche de fond, la création d’une image Docker via **Cloud Build**.
+     - Pousse l’image dans **Artifact Registry** (`germina-backend/builder`).
+  2. **`GET /build_status?questionnaire_id=<id>`**
+     - Liste les builds (images Docker) déjà créées pour ce questionnaire.
+  3. **`GET /list?questionnaire_id=<id>`**
+     - Renvoie la liste des images (méta : `name`, `tag`, `updated_at`).
+  4. **`DELETE /delete_image?questionnaire_id=<id>`**
+     - Supprime un package (toutes versions/tous tags) dans Artifact Registry.
+  5. **`POST /generate_deploy_script`**
      - Fournit un script shell (ou `.ps1`) pour déployer une image Docker sur un hôte Linux/Mac/Windows.
 
 - Utilise Supabase pour :
-  - Authentifier l’utilisateur (`get_current_user`).  
-  - Vérifier/incrémenter son quota (`api_usage.count`).  
-  - Mettre à jour la table `questionnaires` (statut `pending`, `ready`, etc.).  
+  - Authentifier l’utilisateur (`get_current_user`).
+  - Vérifier/incrémenter son quota (`api_usage.count`).
+  - Mettre à jour la table `questionnaires` (statut `pending`, `ready`, etc.).
 
 - Est conçu pour être conteneurisé (`Dockerfile`) et déployé sur **Google Cloud Run**.
 
@@ -46,20 +46,20 @@ Le dossier **`builder/`** contient un service **FastAPI** qui :
 
 ## Prérequis
 
-1. **Python 3.10+**  
-2. **pip** pour gérer les dépendances  
-3. **Google Cloud SDK** (pour déploiement manuel)  
-4. Un compte **Supabase** (URL/clé)  
-5. Un projet **GCP** avec :  
-   - **Cloud Build** activé  
-   - **Artifact Registry** (repo `germina-backend/builder`)  
+1. **Python 3.10+**
+2. **pip** pour gérer les dépendances
+3. **Google Cloud SDK** (pour déploiement manuel)
+4. Un compte **Supabase** (URL/clé)
+5. Un projet **GCP** avec :
+   - **Cloud Build** activé
+   - **Artifact Registry** (repo `germina-backend/builder`)
    - **IAM** : Service Account ayant `"Cloud Run Admin"`, `"Cloud Build Editor"`, `"Artifact Registry Writer"`, etc.
 
 ---
 
 ## Installation & exécution en local
 
-1. Clonez le repo principal si ce n’est pas déjà fait, puis placez‐vous dans le dossier `builder/` :  
+1. Clonez le repo principal si ce n’est pas déjà fait, puis placez‐vous dans le dossier `builder/` :
    ```bash
    cd builder
 
@@ -130,7 +130,7 @@ builder/
 │       └── form.html
 └── README.md                # Ce fichier
 
-(1) to create js bundle for survey render, run following command : 
+(1) to create js bundle for survey render, run following command :
 npx esbuild static/form-entry.js   --bundle   --outfile=static/js/form.bundle.js   --minify   --target=es2019   --format=esm   --global-name=SurveyForm
 
 ---
@@ -141,7 +141,7 @@ Dans .github/workflows/deploy-backend_gcp.yml, le workflow est déclenché à ch
 
 ---
 
-## LICENCE 
+## LICENCE
 
 Ce projet est sous licence **MIT**. Voir le fichier [LICENSE](../LICENSE) pour le texte complet.
 

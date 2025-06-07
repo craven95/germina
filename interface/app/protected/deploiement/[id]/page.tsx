@@ -122,7 +122,7 @@ export default function DeploiementPage({ params }: DeploiementProps) {
         } catch {
           // Ignorer les erreurs temporaires de fetch
         }
-  
+
         if (latest) {
           setCurrentImage(latest);
           setSuccess(`Image créée : ${latest.name}`);
@@ -187,7 +187,7 @@ export default function DeploiementPage({ params }: DeploiementProps) {
 
       <div className="mb-6 text-gray-700">
         {currentImage ? (
-          <><p className="text-green-600 mb-2">✅ Interface créée</p></>  
+          <><p className="text-green-600 mb-2">✅ Interface créée</p></>
         ) : (
           <><p>Pour déployer ce questionnaire, deux étapes sont nécessaires :</p><ol className="list-decimal list-inside pl-4"><li>Création de l'interface</li><li>Déploiement sur un serveur</li></ol></>
         )}

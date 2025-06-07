@@ -6,14 +6,14 @@ Cette partie contient le front‐end de Germina, basé sur Next.js et React, hé
 
 ## Table des matières
 
-1. [Vue d’ensemble](#vue-densemble)  
-2. [Prérequis](#prérequis)  
-3. [Installation & exécution en local](#installation--exécution-en-local)  
-4. [Variables d’environnement](#variables-denvironnement)  
+1. [Vue d’ensemble](#vue-densemble)
+2. [Prérequis](#prérequis)
+3. [Installation & exécution en local](#installation--exécution-en-local)
+4. [Variables d’environnement](#variables-denvironnement)
 5. [Déploiement automatique (GitHub Actions → Vercel)](#déploiement-automatique-github-actions--vercel)
-6. [Structure du dossier](#structure-du-dossier)  
-7. [Foire aux questions (FAQ)](#foire-aux-questions-faq)  
-8. [Licence](#licence)  
+6. [Structure du dossier](#structure-du-dossier)
+7. [Foire aux questions (FAQ)](#foire-aux-questions-faq)
+8. [Licence](#licence)
 
 ---
 
@@ -21,7 +21,7 @@ Cette partie contient le front‐end de Germina, basé sur Next.js et React, hé
 
 La partie **Interface** (dossier `interface/`) est un projet Next.js qui permet à l’utilisateur :
 - De créer et éditer des questionnaires (via Supabase).
-- D’interagir avec l’API “builder” (FastAPI) pour générer, lister et supprimer les images Docker.  
+- D’interagir avec l’API “builder” (FastAPI) pour générer, lister et supprimer les images Docker.
 - D’afficher un chat assistant (MISTRAL AI), un aperçu du questionnaire, etc.
 
 En production, cette application est déployée sur Vercel (ex. : https://\<votre-projet-vercel\>.vercel.app).
@@ -32,16 +32,16 @@ En production, cette application est déployée sur Vercel (ex. : https://\<votr
 
 Avant de lancer localement l’interface, assurez‐vous d’avoir :
 
-1. **Node.js** (v18 LTS ou supérieure)  
-2. **npm** (ou `yarn` / `pnpm`)  
-3. Un compte **Supabase** valide (URL et clés d’API).  
+1. **Node.js** (v18 LTS ou supérieure)
+2. **npm** (ou `yarn` / `pnpm`)
+3. Un compte **Supabase** valide (URL et clés d’API).
 4. L’URL de votre API “builder” (FastAPI) en local (`http://localhost:8000`) ou en production (ex. lien si déployée sur le cloud).
 
 ---
 
 ## Installation & exécution en local
 
-1. Ouvrez un terminal et placez‐vous dans le dossier `interface/` :  
+1. Ouvrez un terminal et placez‐vous dans le dossier `interface/` :
    cd interface
 
 2. Installez les dépendances :
@@ -136,13 +136,13 @@ interface/
 
 ---
 
-## FAQ 
+## FAQ
 
 (à compléter !)
 
 ---
 
-## LICENCE 
+## LICENCE
 
 Ce projet est sous licence **MIT**. Voir le fichier [LICENSE](../LICENSE) pour le texte complet.
 

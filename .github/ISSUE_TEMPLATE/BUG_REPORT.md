@@ -23,10 +23,10 @@ Décrivez ce qui se produit réellement (log d’erreur, message, etc.).
 Décrivez ce que vous auriez dû voir à la place.
 
 **Environnement :**
-- Version de Germina (commit SHA ou tag) : 
-- Système d’exploitation : 
+- Version de Germina (commit SHA ou tag) :
+- Système d’exploitation :
 - Navigateur (pour l’interface) :
-- Branch/commit (pour le backend) : 
+- Branch/commit (pour le backend) :
 - Étapes d’installation particulières (si besoin) :
 
 **Capture d’écran / Logs (facultatif)**

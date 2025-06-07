@@ -1,7 +1,7 @@
 ## Description
 
-Merci pour votre contribution !  
-Veuillez décrire en quelques lignes la modification apportée :  
+Merci pour votre contribution !
+Veuillez décrire en quelques lignes la modification apportée :
 - Quel problème corrigez-vous ou quelle fonctionnalité ajoutez-vous ?
 - Pourquoi ce changement est‐il nécessaire ?
 
@@ -18,7 +18,7 @@ Veuillez décrire en quelques lignes la modification apportée :
 
 Décrivez la ou les étapes pour vérifier que tout fonctionne correctement :
 
-1. Cloner le dépôt et basculer sur la branche de la PR :  
+1. Cloner le dépôt et basculer sur la branche de la PR :
    git checkout <votre-branche>
 
 2.  Installer les dépendances et lancer l’application :

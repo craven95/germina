@@ -2,14 +2,14 @@
 
 import JsonFormRenderer from './jsonformrendered';
 
-export default function PreviewPane({ schemaJson, uiSchemaJson }: { 
+export default function PreviewPane({ schemaJson, uiSchemaJson }: {
   schemaJson: string;
   uiSchemaJson: string;
 }) {
   try {
     const schema = JSON.parse(schemaJson);
     const uiSchema = JSON.parse(uiSchemaJson);
-    
+
     return (
       <div className="flex-1 overflow-y-auto">
         <h3 className="text-lg font-medium mb-4">Aperçu du questionnaire</h3>
