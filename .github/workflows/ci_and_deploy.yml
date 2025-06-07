@@ -1,0 +1,154 @@
+name: CI & Deploy
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  builder-ci:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10"]
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies (builder/)
+        run: |
+          cd builder
+          python3 -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Lint & typecheck (builder/)
+        run: |
+          cd builder
+          source .venv/bin/activate
+          black --check .
+          isort --check-only --profile black .
+          flake8 .
+          mypy .
+
+      # TODO: add python testing
+      #- name: Run pytest
+
+
+  frontend-ci:
+    needs: builder-ci
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+
+      - name: Install & Lint (interface/)
+        run: |
+          cd interface
+          npm ci
+          npm run lint
+
+      # Add JS testing
+      #- name: Run JS tests
+
+# TODO: add dev environment deployment
+
+  # deploy-dev:
+  #   needs: frontend-ci
+  #   runs-on: ubuntu-latest
+  #   if: github.ref == 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/')
+  #   steps:
+  #     - uses: actions/checkout@v3
+
+  #     # Backend → Cloud Run dev
+  #     - name: Authenticate to Google Cloud (dev)
+  #       uses: google-github-actions/auth@v1
+  #       with:
+  #         credentials_json: ${{ secrets.GCP_DEV_CREDENTIALS }}
+  #     - uses: google-github-actions/setup-gcloud@v2
+  #       with:
+  #         project_id: ${{ secrets.GCP_DEV_PROJECT_ID }}
+  #     - run: gcloud auth configure-docker europe-west1-docker.pkg.dev --quiet
+  #     - run: |
+  #         IMAGE_DEV=europe-west1-docker.pkg.dev/${{ secrets.GCP_DEV_PROJECT_ID }}/germina-backend/builder:dev-latest
+  #         docker build -t $IMAGE_DEV builder/
+  #         docker push $IMAGE_DEV
+  #     - run: |
+  #         gcloud run deploy builder-dev \
+  #           --image $IMAGE_DEV \
+  #           --region europe-west1 \
+  #           --platform managed \
+  #           --allow-unauthenticated
+
+  #     # Frontend → Vercel dev
+  #     - name: Setup Node.js
+  #       uses: actions/setup-node@v3
+  #       with:
+  #         node-version: "18"
+  #     - run: |
+  #         cd interface
+  #         npm ci
+  #         npm run build
+  #     - uses: amondnet/vercel-action@v20
+  #       with:
+  #         vercel-token: ${{ secrets.VERCEL_DEV_TOKEN }}
+  #         vercel-org-id: ${{ secrets.VERCEL_DEV_ORG_ID }}
+  #         vercel-project-id: ${{ secrets.VERCEL_DEV_PROJECT_ID }}
+  #         vercel-args: '--prod --yes'
+
+  deploy-prod:
+    needs: frontend-ci
+    runs-on: ubuntu-latest
+    # TODO: For the moment we will deploy for all pushes, later just for tags v...
+    # if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v3
+
+      # Backend → Cloud Run prod
+      - name: Authenticate to Google Cloud (prod)
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+      - run: gcloud auth configure-docker europe-west1-docker.pkg.dev --quiet
+      - run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          IMAGE_PROD=europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/germina-backend/builder:$TAG
+          docker build -t $IMAGE_PROD builder/
+          docker push $IMAGE_PROD
+      - run: |
+          gcloud run deploy builder \
+            --image $IMAGE_PROD \
+            --region europe-west1 \
+            --platform managed \
+            --allow-unauthenticated
+
+      # Frontend → Vercel prod
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+      - run: |
+          cd interface
+          npm ci
+          npm run build
+      - uses: amondnet/vercel-action@v20
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod --yes'
