@@ -112,8 +112,7 @@ jobs:
   deploy-prod:
     needs: frontend-ci
     runs-on: ubuntu-latest
-    # TODO: For the moment we will deploy for all pushes, later just for tags v...
-    # if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v3
 
