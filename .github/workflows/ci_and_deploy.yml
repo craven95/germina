@@ -34,12 +34,11 @@ jobs:
 
       - name: Lint & typecheck
         run: |
-          cd builder
-          source .venv/bin/activate
-          black --check . --exclude .venv
-          isort --check-only --profile black . --skip .venv
-          flake8 . --exclude .venv
-          mypy . --exclude .venv
+          source builder/.venv/bin/activate
+          black --check builder --exclude builder/.venv
+          isort --check-only --profile black builder --skip builder/.venv
+          flake8 builder --config pyproject.toml
+          mypy builder --config-file pyproject.toml
 
       # TODO: add python testing
       #- name: Run pytest
