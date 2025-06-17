@@ -2,6 +2,7 @@ import os
 
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from gotrue.types import User
 from supabase import Client, create_client
 
 security = HTTPBearer()
@@ -13,10 +14,11 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
-def get_current_user(creds: HTTPAuthorizationCredentials = Depends(security)):
+def get_current_user(creds: HTTPAuthorizationCredentials = Depends(security)) -> User:
     """Récupère l'utilisateur via token Supabase JWT.
+
     Args:
-        creds (HTTPAuthorizationCredentials): Les informations d'identification HTTP contenant le token JWT.
+        creds (HTTPAuthorizationCredentials): Informations d'identification contenant le JWT.
     Returns:
         user (dict): Les informations de l'utilisateur récupérées depuis Supabase.
     Raises:
