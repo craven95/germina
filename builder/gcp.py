@@ -4,6 +4,7 @@ import shutil
 import tarfile
 import tempfile
 from pathlib import Path
+from typing import Any, Dict, List, Tuple, Union
 
 from fastapi import HTTPException
 from fastapi.logger import logger
@@ -13,16 +14,18 @@ from google.cloud import logging as cloud_logging
 from google.cloud import storage
 from google.cloud.devtools import cloudbuild_v1
 
-GCP_PROJECT = os.getenv("GCP_PROJECT", "")
-GCR_LOCATION = os.getenv("GCR_LOCATION", "")
-GCR_REPOSITORY = os.getenv("GCR_REPOSITORY", "")
-GCR_REPO_PATH = f"{GCR_LOCATION}-docker.pkg.dev/{GCP_PROJECT}/{GCR_REPOSITORY}"
+# Configuration
+GCP_PROJECT: str = os.getenv("GCP_PROJECT", "")
+GCR_LOCATION: str = os.getenv("GCR_LOCATION", "")
+GCR_REPOSITORY: str = os.getenv("GCR_REPOSITORY", "")
+GCR_REPO_PATH: str = f"{GCR_LOCATION}-docker.pkg.dev/{GCP_PROJECT}/{GCR_REPOSITORY}"
 
+# Initialize Cloud Logging
 cloud_logging_client = cloud_logging.Client()
 cloud_logging_client.setup_logging()
 
 
-def get_user_images(image_prefix: str) -> list:
+def get_user_images(image_prefix: str) -> List[ar.DockerImage]:
     """Récupère les images Docker de l'utilisateur depuis Artifact Registry
     Args:
         image_prefix (str): Le préfixe des noms d'images à rechercher.
@@ -32,35 +35,32 @@ def get_user_images(image_prefix: str) -> list:
         HTTPException: Si une erreur se produit lors de la récupération des images.
     """
     client = ar.ArtifactRegistryClient()
-    parent = (
-        f"projects/{GCP_PROJECT}/locations/{GCR_LOCATION}/repositories/{GCR_REPOSITORY}"
-    )
-    images = []
+    parent: str = f"projects/{GCP_PROJECT}/locations/{GCR_LOCATION}/repositories/{GCR_REPOSITORY}"
+    images: List[ar.DockerImage] = []
     try:
         request = ar.ListDockerImagesRequest(parent=parent)
-        page_result = client.list_docker_images(request=request)
-        for image in page_result:
-            image_name = image.uri.split("/")[-1].split(":")[0]
-            if image_name.startswith(image_prefix):
+        for image in client.list_docker_images(request=request):
+            name = image.uri.split("/")[-1].split(":")[0]
+            if name.startswith(image_prefix):
                 images.append(image)
     except Exception as e:
-        logger.error(f"Erreur Artifact Registry: {str(e)}")
-        raise HTTPException(500, "Erreur de listing des images")
+        logger.error(f"Erreur Artifact Registry: {e}")
+        raise HTTPException(status_code=500, detail="Erreur de listing des images")
 
     return images
 
 
-def delete_package_from_package_name(package_name: str) -> str:
+def delete_package_from_package_name(package_name: str) -> Union[str, Dict[str, str]]:
     """Supprime un package complet dans Artifact Registry
     Args:
         package_name (str): Le nom du package à supprimer.
     Returns:
         str: Un message de succès si la suppression est réussie.
     Raises:
-        HTTPException: Si le package n'existe pas ou si une erreur se produit lors de la suppression.
+        HTTPException: Si package n'existe pas ou si une erreur se produit lors de suppression.
     """
     client = ar.ArtifactRegistryClient()
-    full_package_path = (
+    pkg_path: str = (
         f"projects/{GCP_PROJECT}/"
         f"locations/{GCR_LOCATION}/"
         f"repositories/{GCR_REPOSITORY}/"
@@ -68,37 +68,29 @@ def delete_package_from_package_name(package_name: str) -> str:
     )
 
     try:
-        client.get_package(name=full_package_path)
+        client.get_package(name=pkg_path)
     except ar.exceptions.NotFound:
-        logger.error(f"Aucun package trouvé : {full_package_path}")
+        logger.error(f"Aucun package trouvé : {pkg_path}")
         return "no_images_found"
     except ar.exceptions.PermissionDenied as e:
-        logger.error(f"PermissionDenied get_package({full_package_path}) : {e}")
-        raise HTTPException(
-            status_code=403, detail="Permission refusée pour get_package"
-        )
+        logger.error(f"PermissionDenied get_package({pkg_path}): {e}")
+        raise HTTPException(status_code=403, detail="Permission refusée pour get_package")
     except Exception as e:
-        logger.error(
-            f"Erreur inattendue get_package({full_package_path}) : {type(e).__name__} {e}"
-        )
+        logger.error(f"Erreur get_package({pkg_path}): {type(e).__name__} {e}")
         raise HTTPException(
             status_code=500, detail="Erreur interne lors de la vérification du package"
         )
 
     try:
-        op = client.delete_package(name=full_package_path)
+        op = client.delete_package(name=pkg_path)
         op.result()
-        logger.info(f"✅ Package supprimé entièrement : {full_package_path}")
+        logger.info(f"✅ Package supprimé : {pkg_path}")
         return {"status": "success", "deleted_package": package_name}
     except ar.exceptions.PermissionDenied as e:
-        logger.error(f"PermissionDenied delete_package({full_package_path}) : {e}")
-        raise HTTPException(
-            status_code=403, detail="Permission refusée pour delete_package"
-        )
+        logger.error(f"PermissionDenied delete_package({pkg_path}): {e}")
+        raise HTTPException(status_code=403, detail="Permission refusée pour delete_package")
     except Exception as e:
-        logger.error(
-            f"Erreur delete_package({full_package_path}) : {type(e).__name__} {e}"
-        )
+        logger.error(f"Erreur delete_package({pkg_path}): {type(e).__name__} {e}")
         raise HTTPException(
             status_code=500, detail="Erreur interne lors de la suppression du package"
         )
@@ -118,20 +110,19 @@ def prepare_build_context(qid: str, user_id: str) -> str:
         base = Path(__file__).parent / "survey_template"
         build_dir = Path(tmp_dir) / "custom_build_context"
         shutil.copytree(base, build_dir, dirs_exist_ok=True)
-        archive_name = f"context_{qid}_{user_id}.tar.gz"
+        archive_name: str = f"context_{qid}_{user_id}.tar.gz"
         archive_path = Path(tmp_dir) / archive_name
         with tarfile.open(archive_path, "w:gz") as tar:
             tar.add(build_dir, arcname="custom_build_context")
 
-        storage_client = storage.Client()
-        bucket = storage_client.bucket("germina-build-context")
+        bucket = storage.Client().bucket("germina-build-context")
         blob = bucket.blob(archive_name)
-        blob.upload_from_filename(archive_path)
+        blob.upload_from_filename(str(archive_path))
 
     return archive_name
 
 
-def launch_build(user_id: str, qid: str, payload) -> dict:
+def launch_build(user_id: str, qid: str, payload: Any) -> Dict[str, Any]:
     """Lance le build via Google Cloud Build
     Args:
         user_id (str): L'ID de l'utilisateur.
@@ -142,26 +133,21 @@ def launch_build(user_id: str, qid: str, payload) -> dict:
     Raises:
         HTTPException: Si une erreur se produit lors du lancement du build.
     """
-    # Configuration du client Cloud Build
-    context_object = prepare_build_context(qid, user_id)
-    client_options = ClientOptions(
-        api_endpoint=f"{GCR_LOCATION}-cloudbuild.googleapis.com"
-    )
-    cloudbuild_client = cloudbuild_v1.CloudBuildClient(client_options=client_options)
+    context_obj: str = prepare_build_context(qid, user_id)
+    opts = ClientOptions(api_endpoint=f"{GCR_LOCATION}-cloudbuild.googleapis.com")
+    cb_client = cloudbuild_v1.CloudBuildClient(client_options=opts)
 
-    # Nom de l'image
-    image_name = f"user_{user_id}_q_{qid}"
-    image_tag = f"{GCR_REPO_PATH}/{image_name}:latest"
+    image_name = f"user_{user_id}_q_{qid}:latest"
+    full_tag: str = f"{GCR_REPO_PATH}/{image_name}"
 
-    # Configuration du build
-    build_config = cloudbuild_v1.Build(
+    build = cloudbuild_v1.Build(
         steps=[
             cloudbuild_v1.BuildStep(
                 name="gcr.io/cloud-builders/docker",
                 args=[
                     "build",
                     "-t",
-                    image_tag,
+                    full_tag,
                     "--build-arg",
                     f"Q_SCHEMA={json.dumps(payload.schema)}",
                     "--build-arg",
@@ -174,52 +160,41 @@ def launch_build(user_id: str, qid: str, payload) -> dict:
                 ],
                 dir="custom_build_context",
             ),
-            cloudbuild_v1.BuildStep(
-                name="gcr.io/cloud-builders/docker", args=["push", image_tag]
-            ),
+            cloudbuild_v1.BuildStep(name="gcr.io/cloud-builders/docker", args=["push", full_tag]),
         ],
         source=cloudbuild_v1.Source(
             storage_source=cloudbuild_v1.StorageSource(
-                bucket="germina-build-context",
-                object=context_object,
+                bucket="germina-build-context", object=context_obj
             )
         ),
-        images=[image_tag],
+        images=[full_tag],
         options=cloudbuild_v1.BuildOptions(logging="CLOUD_LOGGING_ONLY"),
     )
 
     try:
-        logger.info(f"Lancement du build pour {image_tag}...")
-        operation = cloudbuild_client.create_build(
-            project_id=GCP_PROJECT, build=build_config
-        )
-        result = operation.result()
-        logger.info(f"Build terminé : {result.status}")
-
-        if result.status == cloudbuild_v1.Build.Status.SUCCESS:
-            logger.info(f"Build réussi : {image_tag}")
-            return {"status": "success", "image": image_tag}
-        else:
-            error_msg = f"Build failed: {result.status_detail}"
-            logger.error(error_msg)
-            return {"status": "failed", "error": error_msg}
-
+        logger.info(f"Lancement du build pour {full_tag}...")
+        op = cb_client.create_build(project_id=GCP_PROJECT, build=build)
+        res = op.result()
+        logger.info(f"Statut du build : {res.status}")
+        if res.status == cloudbuild_v1.Build.Status.SUCCESS:
+            return {"status": "success", "image": full_tag}
+        return {"status": "failed", "error": res.status_detail}
     except Exception:
-        logger.exception("Exception inattendue durant launch_build")
+        logger.exception("Erreur inattendue dans launch_build")
         raise HTTPException(status_code=500, detail="Erreur lors du lancement du build")
 
 
 def generate_deploy_script(
     docker_image_name: str, local_port: int, volume_path: str, os: str
-) -> dict:
+) -> Tuple[str, str]:
     """Génère un script de déploiement pour l'image Docker
     Args:
         docker_image_name (str): Le nom de l'image Docker à déployer.
         local_port (int): Le port local sur lequel l'application sera accessible.
         volume_path (str): Le chemin du volume à monter dans le conteneur.
-        os (str): Le système d'exploitation pour lequel le script est généré ("linux", "mac", "windows").
+        os (str): Système d'exploitation pour le script généré ("linux", "mac", "windows").
     Returns:
-        dict: Un dictionnaire contenant le script de déploiement et son extension.
+        Tuple[str, str]: Un dictionnaire contenant le script de déploiement et son extension.
     Raises:
         HTTPException: Si le système d'exploitation n'est pas supporté.
     """
