@@ -10,7 +10,6 @@ security = HTTPBearer()
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 
-
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
@@ -20,19 +19,21 @@ def get_current_user(creds: HTTPAuthorizationCredentials = Depends(security)) ->
     Args:
         creds (HTTPAuthorizationCredentials): Informations d'identification contenant le JWT.
     Returns:
-        user (dict): Les informations de l'utilisateur récupérées depuis Supabase.
+        user (User): Les informations de l'utilisateur récupérées depuis Supabase.
     Raises:
-        HTTPException: Si le token est invalide ou expiré.
+        HTTPException: Si le token est invalide, expiré ou si l'utilisateur n'existe pas.
     """
     token = creds.credentials
     try:
-        user = supabase.auth.get_user(token).user
-        if user is None:
-            raise
+        response = supabase.auth.get_user(token)
     except Exception as e:
         raise HTTPException(
             status_code=401,
             detail="Token invalide ou expiré",
         ) from e
-
-    return user
+    if response is None or response.user is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Utilisateur non trouvé ou token invalide",
+        )
+    return response.user
