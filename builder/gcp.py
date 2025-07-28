@@ -8,11 +8,12 @@ from typing import Any, Dict, List, Tuple, Union
 
 from fastapi import HTTPException
 from fastapi.logger import logger
+from google.api_core import exceptions as gcp_exceptions
 from google.api_core.client_options import ClientOptions
 from google.cloud import artifactregistry_v1 as ar
 from google.cloud import logging as cloud_logging
-from google.cloud import storage
 from google.cloud.devtools import cloudbuild_v1
+from google.cloud.storage import Client as StorageClient
 
 # Configuration
 GCP_PROJECT: str = os.getenv("GCP_PROJECT", "")
@@ -69,10 +70,10 @@ def delete_package_from_package_name(package_name: str) -> Union[str, Dict[str, 
 
     try:
         client.get_package(name=pkg_path)
-    except ar.exceptions.NotFound:
+    except gcp_exceptions.NotFound:
         logger.error(f"Aucun package trouvé : {pkg_path}")
         return "no_images_found"
-    except ar.exceptions.PermissionDenied as e:
+    except gcp_exceptions.PermissionDenied as e:
         logger.error(f"PermissionDenied get_package({pkg_path}): {e}")
         raise HTTPException(status_code=403, detail="Permission refusée pour get_package")
     except Exception as e:
@@ -86,7 +87,7 @@ def delete_package_from_package_name(package_name: str) -> Union[str, Dict[str, 
         op.result()
         logger.info(f"✅ Package supprimé : {pkg_path}")
         return {"status": "success", "deleted_package": package_name}
-    except ar.exceptions.PermissionDenied as e:
+    except gcp_exceptions.PermissionDenied as e:
         logger.error(f"PermissionDenied delete_package({pkg_path}): {e}")
         raise HTTPException(status_code=403, detail="Permission refusée pour delete_package")
     except Exception as e:
@@ -114,8 +115,7 @@ def prepare_build_context(qid: str, user_id: str) -> str:
         archive_path = Path(tmp_dir) / archive_name
         with tarfile.open(archive_path, "w:gz") as tar:
             tar.add(build_dir, arcname="custom_build_context")
-
-        bucket = storage.Client().bucket("germina-build-context")
+        bucket = StorageClient().bucket("germina-build-context")
         blob = bucket.blob(archive_name)
         blob.upload_from_filename(str(archive_path))
 

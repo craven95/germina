@@ -25,10 +25,10 @@ app.add_middleware(
 )
 
 
-class BuildPayload(BaseModel):  # type: ignore[misc]
+class BuildPayload(BaseModel):
     user_id: str
     title: str
-    schema: Dict[str, Any]
+    schema: Dict[str, Any]  # type: ignore[assignment]
     ui_schema: Dict[str, Any]
 
 

@@ -24,8 +24,8 @@ repos:
     hooks:
       - id: mypy
         name: mypy typing check
+        language: system
         args: ["--config-file=pyproject.toml", "--ignore-missing-imports"]
-        language_version: python3.10
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.4.0
