@@ -45,6 +45,7 @@ jobs:
 
 
   frontend-ci:
+    name: CI - Interface (React)
     needs: builder-ci
     runs-on: ubuntu-latest
     steps:
@@ -112,6 +113,7 @@ jobs:
   deploy-prod:
     needs: frontend-ci
     runs-on: ubuntu-latest
+    name: DEPLOY - Production Vercel and GCP
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v3
