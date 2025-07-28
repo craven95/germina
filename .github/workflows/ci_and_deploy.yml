@@ -132,7 +132,6 @@ jobs:
           IMAGE_PROD=europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/germina-backend/builder:$TAG
           docker build -t $IMAGE_PROD builder/
           docker push $IMAGE_PROD
-      - run: |
           gcloud run deploy builder \
             --image $IMAGE_PROD \
             --region europe-west1 \
