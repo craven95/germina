@@ -37,7 +37,7 @@ jobs:
           source builder/.venv/bin/activate
           black --check builder --exclude builder/.venv
           isort --check-only --profile black builder --skip builder/.venv
-          flake8 builder --config pyproject.toml
+          flake8 builder --config .flake8
           mypy builder --config-file pyproject.toml
 
       # TODO: add python testing
