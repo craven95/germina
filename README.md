@@ -33,6 +33,6 @@ germina.general@gmail.com
 
 ## Licence
 
-Ce projet est sous licence **MIT**. Voir le fichier [LICENSE](LICENSE) pour le texte complet.
+Ce projet est sous licence **GNU GENERAL PUBLIC LICENSE**. Voir le fichier [LICENSE](LICENSE) pour le texte complet.
 
 ---

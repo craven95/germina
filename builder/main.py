@@ -2,16 +2,28 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Response
+from fastapi import (
+    BackgroundTasks,
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Response,
+    UploadFile,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from gcp import (
     delete_package_from_package_name,
     generate_deploy_script,
     get_user_images,
     launch_build,
+    upload_image_to_gcp,
 )
+from image import extract_image_array
 from pydantic import BaseModel
 from users import get_current_user
 
@@ -38,6 +50,41 @@ class DeployScriptPayload(BaseModel):  # type: ignore[misc]
     volume_path: Optional[str] = "~/docker_data"
     os: str
     qid: Optional[str] = "unknown"
+
+
+@app.post("/upload_photo", status_code=201)
+def upload_survey_image(
+    file: UploadFile = File(...),
+    questionnaire_id: str = Form(...),
+    user: Any = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    Upload d'une photo de template pour un questionnaire.
+    Attend multipart/form-data avec:
+      - questionnaire_id (champ form)
+      - file (fichier)
+    Le fichier est stocké dans le bucket GCP configuré via SURVEY_TEMPLATE_BUCKET.
+    Retourne le chemin de l'objet stocké (ex: photos/user_<id>_q_<qid>/uuid.jpg)
+    """
+    if not file:
+        raise HTTPException(status_code=400, detail="Aucun fichier fourni.")
+
+    filename = getattr(file, "filename", "") or "uploaded"
+    ext = Path(filename).suffix.lower()
+    if ext not in [".png", ".jpg", ".jpeg"]:
+        raise HTTPException(
+            status_code=415, detail=f"Extension non supportée: {ext}. Seuls png/jpg autorisés."
+        )
+
+    if file.content_type and file.content_type.lower() not in ["image/png", "image/jpeg"]:
+        raise HTTPException(status_code=415, detail=f"MIME non supporté: {file.content_type}.")
+
+    image_array, metadatas = extract_image_array(file)
+    bucket_saving_path = f"user_{user.id}_q_{questionnaire_id}"
+
+    upload_image_to_gcp(image_array, bucket_saving_path)
+
+    return {"path": bucket_saving_path}
 
 
 @app.post("/build/{questionnaire_id}", status_code=202)  # type: ignore[misc]

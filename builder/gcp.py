@@ -3,23 +3,31 @@ import os
 import shutil
 import tarfile
 import tempfile
+from io import BytesIO
 from pathlib import Path
 from typing import Any, Dict, List, Tuple, Union
 
+import numpy.typing as npt
 from fastapi import HTTPException
 from fastapi.logger import logger
 from google.api_core import exceptions as gcp_exceptions
 from google.api_core.client_options import ClientOptions
 from google.cloud import artifactregistry_v1 as ar
 from google.cloud import logging as cloud_logging
+from google.cloud import storage
 from google.cloud.devtools import cloudbuild_v1
 from google.cloud.storage import Client as StorageClient
+from image import encode_image_array
 
 # Configuration
 GCP_PROJECT: str = os.getenv("GCP_PROJECT", "")
 GCR_LOCATION: str = os.getenv("GCR_LOCATION", "")
 GCR_REPOSITORY: str = os.getenv("GCR_REPOSITORY", "")
 GCR_REPO_PATH: str = f"{GCR_LOCATION}-docker.pkg.dev/{GCP_PROJECT}/{GCR_REPOSITORY}"
+SURVEY_TEMPLATE_BUCKET: str = os.getenv("SURVEY_TEMPLATE_BUCKET", "")
+
+ALLOWED_IMAGE_MIMES = {"image/png", "image/jpeg", "image/jpg"}
+ALLOWED_EXTS = {".png", ".jpg", ".jpeg"}
 
 # Initialize Cloud Logging
 cloud_logging_client = cloud_logging.Client()
@@ -51,6 +59,26 @@ def get_user_images(image_prefix: str) -> List[ar.DockerImage]:
     return images
 
 
+def upload_image_to_gcp(
+    image_array: npt.NDArray[Any],
+    destination_blob_name: str,
+    extension: str = "jpg",
+    bucket_name: str = SURVEY_TEMPLATE_BUCKET,
+) -> bool:
+    """Uploads a file to the bucket."""
+    try:
+        storage_client = storage.Client()
+        bucket = storage_client.get_bucket(bucket_name)
+        blob = bucket.blob(destination_blob_name)
+        image_bytes = encode_image_array(image_array, encoder=extension, color_space="BGR")
+        blob.upload_from_file(BytesIO(image_bytes), content_type=f"image/{extension}")
+        print(f"File {destination_blob_name} uploaded to {bucket_name}.")
+        return True
+    except Exception as e:
+        print(e)
+        return False
+
+
 def delete_package_from_package_name(package_name: str) -> Union[str, Dict[str, str]]:
     """Supprime un package complet dans Artifact Registry
     Args:
@@ -67,6 +95,8 @@ def delete_package_from_package_name(package_name: str) -> Union[str, Dict[str, 
         f"repositories/{GCR_REPOSITORY}/"
         f"packages/{package_name}"
     )
+
+    delete_blob_image_if_exists(object_path=package_name)
 
     try:
         client.get_package(name=pkg_path)
@@ -94,6 +124,41 @@ def delete_package_from_package_name(package_name: str) -> Union[str, Dict[str, 
         logger.error(f"Erreur delete_package({pkg_path}): {type(e).__name__} {e}")
         raise HTTPException(
             status_code=500, detail="Erreur interne lors de la suppression du package"
+        )
+
+
+def delete_blob_image_if_exists(object_path: str) -> bool:
+    """
+    Supprime un blob s'il existe. Retourne True si un blob a été supprimé, False sinon.
+    """
+    try:
+        storage_client = StorageClient()
+        bucket = storage_client.bucket(SURVEY_TEMPLATE_BUCKET)
+        blob = bucket.blob(object_path)
+        if blob.exists(client=storage_client):
+            logger.info(
+                f"Objet trouvé dans {SURVEY_TEMPLATE_BUCKET}/{object_path}"
+                "suppression avant upload."
+            )
+            blob.delete(client=storage_client)
+            return True
+        return False
+    except gcp_exceptions.GoogleAPIError as ex:
+        logger.error(
+            "Erreur GCP lors de la vérification/suppression du blob"
+            f"{SURVEY_TEMPLATE_BUCKET}/{object_path}: {ex}"
+        )
+        # remonter une erreur 502 pour les erreurs GCP (cohérent avec le reste du fichier)
+        raise HTTPException(
+            status_code=502, detail=f"Erreur GCP lors de la suppression préalable : {str(ex)}"
+        )
+    except Exception as ex:
+        logger.error(
+            "Erreur inattendue lors de la suppression du blob"
+            f"{SURVEY_TEMPLATE_BUCKET}/{object_path}: {type(ex).__name__} {ex}"
+        )
+        raise HTTPException(
+            status_code=500, detail="Erreur interne lors de la suppression préalable du fichier."
         )
 
 
