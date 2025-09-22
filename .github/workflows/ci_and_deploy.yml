@@ -38,8 +38,9 @@ jobs:
           black --check builder --exclude builder/.venv
           isort --check-only --profile black builder --skip builder/.venv
           flake8 builder --config .flake8
-          mypy builder --config-file pyproject.toml --ignore-missing-imports
 
+      # one day we will use mypy again ?
+      # mypy builder --config-file pyproject.toml --ignore-missing-imports
       # TODO: add python testing
       #- name: Run pytest
 

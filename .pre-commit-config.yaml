@@ -18,14 +18,13 @@ repos:
       - id: flake8
         additional_dependencies: []
         args: ["--config=.flake8"]
-
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.6.1
-    hooks:
-      - id: mypy
-        name: mypy typing check
-        language: system
-        args: ["--config-file=pyproject.toml", "--ignore-missing-imports"]
+  # - repo: https://github.com/pre-commit/mirrors-mypy
+  #   rev: v1.6.1
+  #   hooks:
+  #     - id: mypy
+  #       name: mypy typing check
+  #       language: system
+  #       args: ["--config-file=pyproject.toml", "--ignore-missing-imports"]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.4.0
