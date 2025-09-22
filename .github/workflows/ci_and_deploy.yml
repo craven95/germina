@@ -148,62 +148,17 @@ jobs:
         run: gcloud auth configure-docker europe-west1-docker.pkg.dev --quiet
       - name: Push Docker image to GCP and run it
         run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
           TAG=${GITHUB_REF#refs/tags/}
+          else
+            SHORT_SHA=${GITHUB_SHA::8}
+            TAG=dev-${SHORT_SHA}
+          fi
           IMAGE_PROD=europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/germina-backend/builder:$TAG
           docker build -t $IMAGE_PROD builder/
           docker push $IMAGE_PROD
           gcloud run deploy builder \
             --image $IMAGE_PROD \
-            --region europe-west1 \
-            --platform managed \
-            --allow-unauthenticated
-
-  deploy-dev:
-    needs: frontend-ci
-    runs-on: ubuntu-latest
-    name: DEPLOY - Dev (Vercel & GCP)
-    if: ! startsWith(github.ref, 'refs/tags/v')
-    steps:
-      - uses: actions/checkout@v3
-
-      # Frontend → Vercel (dev)
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: "18"
-      - run: |
-          cd interface
-          npm ci
-          npm run build
-      - uses: amondnet/vercel-action@v20
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          # tu peux garder '--prod --yes' ou adapter pour previews si tu veux
-          vercel-args: '--prod --yes'
-
-      # Backend → Cloud Run (dev)
-      - name: Authenticate to GCP
-        uses: google-github-actions/auth@v1
-        with:
-          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-      - name: Authenticate to GCP project
-        uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
-      - name: Configure Docker for GCP
-        run: gcloud auth configure-docker europe-west1-docker.pkg.dev --quiet
-      - name: Push Docker image to GCP and run it (dev tag)
-        run: |
-          # créer un tag dev-<short-sha> basé sur le commit
-          SHORT_SHA=${GITHUB_SHA::8}
-          TAG=dev-${SHORT_SHA}
-          IMAGE_DEV=europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/germina-backend/builder:$TAG
-          docker build -t $IMAGE_DEV builder/
-          docker push $IMAGE_DEV
-          gcloud run deploy builder \
-            --image $IMAGE_DEV \
             --region europe-west1 \
             --platform managed \
             --allow-unauthenticated
