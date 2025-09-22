@@ -12,3 +12,7 @@ google-cloud-logging
 google-cloud-artifact-registry==1.9.0
 pymupdf
 numpy
+opencv-python-headless
+Pillow
+imagecodecs
+python-multipart
