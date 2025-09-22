@@ -22,7 +22,7 @@ export default function NewQuestionnaireModern() {
   const [saving, setSaving] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -45,13 +45,13 @@ export default function NewQuestionnaireModern() {
       return;
     }
 
-    // Basic validation
-    if (!f.type.startsWith('image/')) {
+    const allowedTypes = ["image/png", "image/jpeg", "application/pdf"];
+    if (!allowedTypes.includes(f.type)) {
       setErrorMsg('Seules les images sont acceptées.');
       return;
     }
     if (f.size > 10 * 1024 * 1024) {
-      setErrorMsg('Image trop volumineuse (max 10MB).');
+      setErrorMsg('Fichier trop volumineuse (max 10MB).');
       return;
     }
 
@@ -80,12 +80,12 @@ export default function NewQuestionnaireModern() {
     if (inputRef.current) inputRef.current.value = '';
   };
 
-  const uploadPhotoToBackend = async (fileToUpload: File, token: string, questionnaireId: string) => {
+  const uploadSurveyFileToBackend = async (fileToUpload: File, token: string, questionnaireId: string) => {
     const form = new FormData();
     form.append('file', fileToUpload);
     form.append('questionnaire_id', questionnaireId);
 
-    const res = await fetch(`${builderApiUrl}/upload_photo`, {
+    const res = await fetch(`${builderApiUrl}/upload_file`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`
@@ -95,7 +95,7 @@ export default function NewQuestionnaireModern() {
 
     if (!res.ok) {
       const errText = await res.text();
-      throw new Error(errText || 'Erreur upload photo');
+      throw new Error(errText || 'Erreur upload fichier');
     }
 
     const json = await res.json();
@@ -154,9 +154,9 @@ export default function NewQuestionnaireModern() {
 
       if (file) {
         try {
-          setUploadingPhoto(true);
+          setUploadingFile(true);
           const token = await getToken();
-          const path = await uploadPhotoToBackend(file, token, questionnaireId);
+          const path = await uploadSurveyFileToBackend(file, token, questionnaireId);
 
           const { error: updateErr } = await supabase
             .from('questionnaires')
@@ -164,20 +164,20 @@ export default function NewQuestionnaireModern() {
             .eq('id', questionnaireId);
 
           if (updateErr) {
-            console.error('Erreur lors de la mise à jour du chemin photo :', updateErr);
+            console.error('Erreur lors de la mise à jour du chemin fichier :', updateErr);
             // Non blocking
           }
         } catch (e: any) {
-          console.error('Erreur upload photo:', e);
-          const keep = confirm('La sauvegarde de la photo a échoué. Créer le questionnaire sans la photo ?');
+          console.error('Erreur upload fichier:', e);
+          const keep = confirm('La sauvegarde du fichier a échoué. Créer le questionnaire manuellement sans modèle ?');
           if (!keep) {
             try { await supabase.from('questionnaires').delete().eq('id', questionnaireId); } catch (delErr) { console.error('Suppression échouée', delErr); }
             setSaving(false);
-            setUploadingPhoto(false);
+            setUploadingFile(false);
             return;
           }
         } finally {
-          setUploadingPhoto(false);
+          setUploadingFile(false);
         }
       }
 
@@ -198,17 +198,17 @@ export default function NewQuestionnaireModern() {
             </button>
             {file ? (
               <span className="ml-3 inline-flex items-center gap-2 text-green-700 bg-green-50 px-2 py-1 rounded text-xs">
-                <CheckCircle size={14} /> Photo sélectionnée
+                <CheckCircle size={14} /> Fichier sélectionnée
               </span>
             ) : (
               <span className="ml-3 inline-flex items-center gap-2 text-yellow-800 bg-yellow-50 px-2 py-1 rounded text-xs">
-                <AlertTriangle size={14} /> Photo recommandée
+                <AlertTriangle size={14} /> Fichier recommandée
               </span>
             )}
           </div>
 
           <div className="flex items-center gap-3">
-            {uploadingPhoto && (
+            {uploadingFile && (
               <div className="flex items-center gap-2 text-sm text-gray-600">
                 <Loader2 className="animate-spin" size={16} /> Upload…
               </div>
@@ -216,11 +216,11 @@ export default function NewQuestionnaireModern() {
 
             <button
               onClick={handleCreate}
-              disabled={saving || uploadingPhoto}
+              disabled={saving || uploadingFile}
               className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
             >
               <ArrowRight size={16} />
-              {saving ? 'Création...' : file ? 'Créer (avec photo)' : 'Créer'}
+              {saving ? 'Création...' : file ? 'Créer (avec fichier)' : 'Créer'}
             </button>
           </div>
         </div>
@@ -252,22 +252,27 @@ export default function NewQuestionnaireModern() {
                     <CloudUpload size={28} />
                   </div>
                   <div className="min-w-0">
-                    <p className="font-semibold text-gray-800 truncate">Glisser-déposer la photo du template</p>
+                    <p className="font-semibold text-gray-800 truncate">Déposer le modèle de votre questionnaire</p>
                     <p className="text-sm text-gray-500">ou <button className="text-blue-600 underline" onClick={() => inputRef.current?.click()}>parcourir</button> votre ordinateur</p>
-                    <input ref={inputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+                    <input ref={inputRef} type="file" accept="image/*,application/pdf" onChange={handleFileChange} className="hidden" />
                   </div>
                 </div>
 
-                <p className="mt-3 text-xs text-gray-500">Formats supportés: JPG, PNG — Taille max: 10 MB.</p>
+                <p className="mt-3 text-xs text-gray-500">Formats supportés: PDF, JPG, PNG — Taille max: 10 MB.</p>
 
                 {errorMsg && <div className="mt-3 text-sm text-red-600">{errorMsg}</div>}
               </div>
 
               <div className="w-44 h-32 bg-gray-50 rounded-md border flex items-center justify-center overflow-hidden relative">
-                {previewUrl ? (
+              {previewUrl ? (
                   <>
-                    <img src={previewUrl} alt="Aperçu" className="object-cover w-full h-full" />
-                    <button onClick={removeFile} title="Retirer la photo" className="absolute top-2 right-2 bg-white rounded-full p-1 shadow">
+                    {file?.type === "application/pdf" ? (
+                      // Aperçu simple d'un PDF : première page ou viewer natif
+                      <embed src={previewUrl} type="application/pdf" className="object-cover w-full h-full" />
+                    ) : (
+                      <img src={previewUrl} alt="Aperçu" className="object-cover w-full h-full" />
+                    )}
+                    <button onClick={removeFile} title="Retirer le fichier" className="absolute top-2 right-2 bg-white rounded-full p-1 shadow">
                       <X size={14} />
                     </button>
                   </>
@@ -282,7 +287,7 @@ export default function NewQuestionnaireModern() {
 
             {!file && (
               <div className="mt-4 p-3 rounded border-l-4 border-yellow-400 bg-yellow-50 text-yellow-800">
-                <strong>Conseil :</strong> Ajouter une photo du template maintenant permet d'automatiser la numérisation du questionnaire — sinon vous pourrez créer et remplir le questionnaire manuellement plus tard.
+                <strong>Conseil :</strong> Vous pourrez créer et remplir le questionnaire manuellement plus tard mais une photo du modèle facilitera grandement la création automatique !
               </div>
             )}
           </div>

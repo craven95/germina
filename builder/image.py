@@ -3,6 +3,7 @@ from io import BytesIO
 from typing import Any, Dict, Literal, Optional, Tuple, cast
 
 import cv2
+import fitz
 import numpy as np
 import numpy.typing as npt
 from fastapi import HTTPException, UploadFile
@@ -198,3 +199,45 @@ def extract_image_array(
         pass
 
     return arr, meta
+
+
+def pdf_to_image_array(
+    file: UploadFile,
+) -> Tuple[npt.NDArray[Any], Dict[str, Any]]:
+    """Convertit la première page d'un PDF en image (numpy array) et retourne les métadonnées.
+
+    Args:
+        file (UploadFile): Le fichier PDF à convertir.
+    Returns:
+        Tuple[npt.NDArray[Any], Dict[str, Any]]: image_array, metadatas.
+    Raises:
+        HTTPException: Si le PDF ne peut pas être lu ou converti.
+    """
+    try:
+        file.file.seek(0)
+        pdf_bytes = file.file.read()
+
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        page = doc.load_page(0)
+        zoom = 2.0
+        mat = fitz.Matrix(zoom, zoom)
+        pix = page.get_pixmap(matrix=mat, alpha=False)
+
+        pil_img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+        image_array = np.asarray(pil_img)
+
+        metadatas = {
+            "width": pil_img.width,
+            "height": pil_img.height,
+            "mode": pil_img.mode,
+            "format": "PDF",
+            "size_bytes": len(pdf_bytes),
+        }
+
+        doc.close()
+
+    except Exception as e:
+        print('AHH OKOK ')
+        raise HTTPException(status_code=400, detail=f"Impossible de convertir le PDF en image: {e}")
+
+    return image_array, metadatas

@@ -23,7 +23,7 @@ from gcp import (
     launch_build,
     upload_image_to_gcp,
 )
-from image import extract_image_array
+from image import extract_image_array, pdf_to_image_array
 from pydantic import BaseModel
 from users import get_current_user
 
@@ -52,14 +52,14 @@ class DeployScriptPayload(BaseModel):  # type: ignore[misc]
     qid: Optional[str] = "unknown"
 
 
-@app.post("/upload_photo", status_code=201)
-def upload_survey_image(
+@app.post("/upload_file", status_code=201)
+def upload_survey_template(
     file: UploadFile = File(...),
     questionnaire_id: str = Form(...),
     user: Any = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """
-    Upload d'une photo de template pour un questionnaire.
+    Upload de template pour un questionnaire.
     Attend multipart/form-data avec:
       - questionnaire_id (champ form)
       - file (fichier)
@@ -68,18 +68,23 @@ def upload_survey_image(
     """
     if not file:
         raise HTTPException(status_code=400, detail="Aucun fichier fourni.")
-
     filename = getattr(file, "filename", "") or "uploaded"
     ext = Path(filename).suffix.lower()
-    if ext not in [".png", ".jpg", ".jpeg"]:
+    if ext not in [".png", ".jpg", ".jpeg", ".pdf"]:
         raise HTTPException(
             status_code=415, detail=f"Extension non supportée: {ext}. Seuls png/jpg autorisés."
         )
-
-    if file.content_type and file.content_type.lower() not in ["image/png", "image/jpeg"]:
+    if file.content_type and file.content_type.lower() not in [
+        "image/png",
+        "image/jpeg",
+        "application/pdf",
+    ]:
         raise HTTPException(status_code=415, detail=f"MIME non supporté: {file.content_type}.")
+    if ext == ".pdf" or (file.content_type and file.content_type.lower() == "application/pdf"):
+        image_array, metadatas = pdf_to_image_array(file)
+    else:
+        image_array, metadatas = extract_image_array(file)
 
-    image_array, metadatas = extract_image_array(file)
     bucket_saving_path = f"user_{user.id}_q_{questionnaire_id}"
 
     upload_image_to_gcp(image_array, bucket_saving_path)
