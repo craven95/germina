@@ -8,13 +8,6 @@ profile = 'black'
 line_length = 100
 known_first_party = ['builder']
 
-[tool.mypy]
-python_version = "3.10"
-strict = true
-ignore_missing_imports = true
-warn_unused_ignores = false
-disable_error_code = ["no-untyped-call"]
-
 [build-system]
 requires = ['setuptools', 'wheel']
 build-backend = 'setuptools.build_meta'
