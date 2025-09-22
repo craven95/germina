@@ -14,6 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY users.py /app/
 COPY gcp.py /app/
 COPY main.py /app/
+COPY image.py /app/
 
 COPY survey_template /app/survey_template
 
