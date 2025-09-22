@@ -7,7 +7,6 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any, Dict, List, Tuple, Union
 
-import numpy.typing as npt
 from fastapi import HTTPException
 from fastapi.logger import logger
 from google.api_core import exceptions as gcp_exceptions
@@ -17,7 +16,6 @@ from google.cloud import logging as cloud_logging
 from google.cloud import storage
 from google.cloud.devtools import cloudbuild_v1
 from google.cloud.storage import Client as StorageClient
-from image import encode_image_array
 
 # Configuration
 GCP_PROJECT: str = os.getenv("GCP_PROJECT", "")
@@ -59,8 +57,8 @@ def get_user_images(image_prefix: str) -> List[ar.DockerImage]:
     return images
 
 
-def upload_image_to_gcp(
-    image_array: npt.NDArray[Any],
+def upload_image_bytes_to_gcp(
+    image_bytes: bytes,
     destination_blob_name: str,
     extension: str = "jpg",
     bucket_name: str = SURVEY_TEMPLATE_BUCKET,
@@ -70,7 +68,6 @@ def upload_image_to_gcp(
         storage_client = storage.Client()
         bucket = storage_client.get_bucket(bucket_name)
         blob = bucket.blob(destination_blob_name)
-        image_bytes = encode_image_array(image_array, encoder=extension, color_space="BGR")
         blob.upload_from_file(BytesIO(image_bytes), content_type=f"image/{extension}")
         print(f"File {destination_blob_name} uploaded to {bucket_name}.")
         return True

@@ -21,9 +21,9 @@ from gcp import (
     generate_deploy_script,
     get_user_images,
     launch_build,
-    upload_image_to_gcp,
+    upload_image_bytes_to_gcp,
 )
-from image import extract_image_array, pdf_to_image_array
+from image import encode_image_array, extract_image_array, pdf_to_image_array
 from pydantic import BaseModel
 from users import get_current_user
 
@@ -87,7 +87,11 @@ def upload_survey_template(
 
     bucket_saving_path = f"user_{user.id}_q_{questionnaire_id}"
 
-    upload_image_to_gcp(image_array, bucket_saving_path)
+    encoder = "png" if ext == ".png" else "jpg"
+
+    upload_image_bytes_to_gcp(
+        encode_image_array(image_array, encoder=encoder, color_space="BGR"), bucket_saving_path
+    )
 
     return {"path": bucket_saving_path}
 
